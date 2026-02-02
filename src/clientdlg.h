@@ -86,6 +86,8 @@ public:
                  const bool       bMuteStream,
                  const bool       bNEnableIPv6,
                  QWidget*         parent = nullptr );
+    int iRememberInstrument;
+    QString qstrRememberName;
 
 protected:
     void SetGUIDesign ( const EGUIDesign eNewDesign );
@@ -181,6 +183,8 @@ public slots:
     void OnNumMixerPanelRowsChanged ( int value ) { MainMixerBoard->SetNumMixerPanelRows ( value ); }
 
     void OnSettingsStateChanged ( int value );
+    void OnEarStateChanged ( int value );
+    void OnListenerStateChanged ( int value );
     void OnChatStateChanged ( int value );
     void OnLocalMuteStateChanged ( int value );
 
