@@ -495,14 +495,14 @@
             <item>
              <widget class="QCheckBox" name="chbEar">
               <property name="text">
-               <string>Ear</string>
+               <string>&amp;Instrument: Ear</string>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QCheckBox" name="chbListener">
               <property name="text">
-               <string>Listener</string>
+               <string>&amp;Alias: Listener</string>
               </property>
              </widget>
             </item>
