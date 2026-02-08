@@ -1,3 +1,6 @@
+TARGET_ARCHS='arm64'
+
+
 #!/bin/bash
 set -eu -o pipefail
 
@@ -234,3 +237,6 @@ if [[ -n "$macapp_cert_name" ]]; then
     # Create pkg file for App Store submission if certificate is given
     build_storesign_pkg "${CLIENT_TARGET_NAME}" "${SERVER_TARGET_NAME}"
 fi
+
+
+codesign --fore --deep --sign "-" /Debug/Jmulus.app

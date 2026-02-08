@@ -959,6 +959,16 @@ Wir haben Deinen Kanal stummgeschaltet und die Funktion &apos;Stummschalten&apos
         <translation>ms</translation>
     </message>
     <message>
+        <location filename="../clientdlgbase.ui" line="478"/>
+        <source>&amp;Instrument: Ear</source>
+        <translation>Instrument: Ohr</translation>
+    </message>
+    <message>
+        <location filename="../clientdlgbase.ui" line="488"/>
+        <source>&amp;Alias: Listener</source>
+        <translation>Alias: Zuhörer</translation>
+    </message>
+    <message>
         <location filename="../clientdlgbase.ui" line="498"/>
         <source>&amp;Mute Myself</source>
         <translation>Stu&amp;mmschalten</translation>

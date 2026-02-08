@@ -455,6 +455,10 @@ CClientDlg::CClientDlg ( CClient*         pNCliP,
     // check boxes
     QObject::connect ( chbSettings, &QCheckBox::stateChanged, this, &CClientDlg::OnSettingsStateChanged );
 
+    // check boxes
+    QObject::connect ( chbEar, &QCheckBox::stateChanged, this, &CClientDlg::OnEarStateChanged );
+    QObject::connect ( chbListener, &QCheckBox::stateChanged, this, &CClientDlg::OnListenerStateChanged );
+
     QObject::connect ( chbChat, &QCheckBox::stateChanged, this, &CClientDlg::OnChatStateChanged );
 
     QObject::connect ( chbLocalMute, &QCheckBox::stateChanged, this, &CClientDlg::OnLocalMuteStateChanged );
@@ -588,14 +592,12 @@ CClientDlg::CClientDlg ( CClient*         pNCliP,
     // Send the request to two servers for redundancy if either or both of them
     // has a higher release version number, the reply will trigger the notification.
 
-    // Don't use SRV resolution when resolving update servers.
-
-    if ( NetworkUtil::ParseNetworkAddressBare ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
+    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
     {
         pClient->CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
     }
 
-    if ( NetworkUtil::ParseNetworkAddressBare ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
+    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
     {
         pClient->CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
     }
@@ -1033,6 +1035,36 @@ void CClientDlg::OnSettingsStateChanged ( int value )
     {
         ClientSettingsDlg.hide();
     }
+}
+
+void CClientDlg::OnEarStateChanged ( int value )
+{
+    if ( value == Qt::Checked )
+    {
+        iRememberInstrument = pClient->ChannelInfo.iInstrument;
+        pClient->ChannelInfo.iInstrument=25;
+    }
+    else
+    {
+        pClient->ChannelInfo.iInstrument=iRememberInstrument;
+
+    }
+     pClient->SetRemoteInfo();
+}
+void CClientDlg::OnListenerStateChanged ( int value )
+{
+    if ( value == Qt::Checked )
+    {
+        qstrRememberName = pClient->ChannelInfo.strName;
+        //pClient->ChannelInfo.strName = qstrJustListening;
+        pClient->ChannelInfo.strName = tr("Listener");
+    }
+    else
+    {
+        pClient->ChannelInfo.strName=qstrRememberName;
+
+    }
+     pClient->SetRemoteInfo();
 }
 
 void CClientDlg::OnChatStateChanged ( int value )
