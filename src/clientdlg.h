@@ -125,14 +125,19 @@ protected:
     virtual void dragEnterEvent ( QDragEnterEvent* Event ) { ManageDragNDrop ( Event, true ); }
     virtual void dropEvent ( QDropEvent* Event ) { ManageDragNDrop ( Event, false ); }
     void         UpdateDisplay();
+    void         WriteRecordingSidecarFiles ( const QString& recordingFilePath );
+    void         WriteRecordingInfoTextFile ( const QString& infoFilePath );
+    void         WriteRecordingScreenshot ( const QString& screenshotFilePath );
 
     CClientSettingsDlg ClientSettingsDlg;
     CChatDlg           ChatDlg;
     CConnectDlg        ConnectDlg;
     CAnalyzerConsole   AnalyzerConsole;
+    CVector<CChannelInfo> vecCurrentConClientList;
 
 public slots:
     void OnConnectDisconBut();
+    void OnRecordButtonClicked ( bool checked );
     void OnTimerSigMet();
     void OnTimerBuffersLED();
     void OnTimerCheckAudioDeviceOk();

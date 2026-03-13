@@ -29,6 +29,7 @@
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
+#include <QFile>
 #ifdef USE_OPUS_SHARED_LIB
 #    include "opus/opus_custom.h"
 #else
@@ -40,6 +41,7 @@
 #include "util.h"
 #include "plugins/audioreverb.h"
 #include "buffer.h"
+#include "recorder/cwavestream.h"
 #include "signalhandler.h"
 
 #if defined( _WIN32 ) && !defined( JACK_ON_WINDOWS )
@@ -267,6 +269,13 @@ public:
     void SetRemoteInfo() { Channel.SetRemoteInfo ( ChannelInfo ); }
 
     void CreateChatTextMes ( const QString& strChatText ) { Channel.CreateChatTextMes ( strChatText ); }
+    void CreateSetRecordingDirectoryMes ( const QString& strRecordingDir ) { Channel.CreateSetRecordingDirectoryMes ( strRecordingDir ); }
+    void CreateStartRecordingMes() { Channel.CreateStartRecordingMes(); }
+    void CreateStopRecordingMes() { Channel.CreateStopRecordingMes(); }
+    bool StartLocalRecording ( const QString& strRecordingDir, QString& strError );
+    void StopLocalRecording();
+    QString GetLocalRecordingFilePath();
+    bool IsLocalRecording() { return bIsLocalRecording; }
 
     void CreateCLPingMes() { ConnLessProtocol.CreateCLPingMes ( Channel.GetAddress(), PreparePingMessage() ); }
 
@@ -308,6 +317,7 @@ protected:
     int  PreparePingMessage();
     int  EvaluatePingMessage ( const int iMs );
     void CreateServerJitterBufferMessage();
+    void WriteLocalRecordingFrame ( const CVector<int16_t>& vecsStereoSndCrd );
 
     void ClearClientChannels();
     void FreeClientChannel ( const int iServerChannelID );
@@ -392,6 +402,11 @@ protected:
     bool   bJitterBufferOK;
     bool   bEnableIPv6;
     bool   bMuteMeInPersonalMix;
+    bool   bIsLocalRecording;
+    QString strLocalRecordingFilePath;
+    QMutex MutexLocalRecording;
+    QFile* pLocalRecordingFile;
+    recorder::CWaveStream* pLocalRecordingStream;
     QMutex MutexDriverReinit;
 
     // server settings

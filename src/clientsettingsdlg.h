@@ -84,6 +84,8 @@ public slots:
     void OnEnableOPUS64StateChanged ( int value );
     void OnFeedbackDetectionChanged ( int value );
     void OnCustomDirectoriesChanged ( bool bDelete );
+    void OnRecordingDirectoryEditingFinished() { pSettings->strRecordingDirectory = edtRecordingDirectory->text().trimmed(); }
+    void OnSelectRecordingDirectory();
     void OnNewClientLevelEditingFinished() { pSettings->iNewClientFaderLevel = edtNewClientLevel->text().toInt(); }
     void OnInputBoostChanged();
     void OnSndCrdBufferDelayButtonGroupClicked ( QAbstractButton* button );

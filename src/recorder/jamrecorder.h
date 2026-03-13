@@ -27,7 +27,9 @@
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
+#include <QList>
 #include <QMutex>
+#include <QSet>
 
 #include "../util.h"
 #include "../channel.h"
@@ -74,7 +76,13 @@ class CJamClient : public QObject
     Q_OBJECT
 
 public:
-    CJamClient ( const qint64 frame, const int numChannels, const QString name, const CHostAddress& address, const QDir recordBaseDir );
+    CJamClient ( const qint64      frame,
+                 const int         numChannels,
+                 const QString     name,
+                 const CHostAddress& address,
+                 const QDir        recordBaseDir,
+                 const int         fileSequenceNumber,
+                 const QDateTime&  recordingStartDateTime );
 
     void Frame ( const QString name, const CVector<int16_t>& pcm, int iServerFrameSizeSamples );
 
@@ -130,7 +138,7 @@ public:
 
     QMap<QString, QList<STrackItem>> Tracks();
 
-    QString Name() { return sessionDir.dirName(); }
+    QString Name() { return sessionName; }
 
     const QDir SessionDir() { return sessionDir; }
 
@@ -142,8 +150,11 @@ private:
     CJamSession();
 
     const QDir sessionDir;
+    const QString sessionName;
+    const QDateTime sessionStartDateTime;
 
     qint64                       currentFrame;
+    int                          nextFileSequenceNumber;
     int                          chIdDisconnected;
     QVector<CJamClient*>         vecptrJamClients;
     QList<CJamClientConnection*> jamClientConnections;
@@ -182,6 +193,8 @@ private:
     QDir         recordBaseDir;
     int          iServerFrameSizeSamples;
     bool         isRecording;
+    bool         useClientFilter = false;
+    QSet<int>    allowedClientIds;
     CJamSession* currentSession;
     QMutex       ChIdMutex;
 
@@ -210,6 +223,8 @@ public slots:
      * @param iChID channel number of client
      */
     void OnDisconnected ( int iChID );
+
+    void OnSetClientFilter ( QList<int> channelIds );
 
     /**
      * @brief Handle a frame of data to process

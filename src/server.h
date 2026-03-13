@@ -63,6 +63,9 @@ public:
     void OnMuteStateHasChangedCh ( int iChanID, bool bIsMuted ) { CreateOtherMuteStateChanged ( slotId - 1, iChanID, bIsMuted ); }
 
     void OnServerAutoSockBufSizeChangeCh ( int iNNumFra ) { CreateAndSendJitBufMessage ( slotId - 1, iNNumFra ); }
+    void OnSetRecordingDirectoryReceivedCh ( QString strRecordingDir ) { SetRecordingDirectoryForChannel ( slotId - 1, strRecordingDir ); }
+    void OnStartRecordingReceivedCh() { StartRecordingForChannel ( slotId - 1 ); }
+    void OnStopRecordingReceivedCh() { StopRecordingForChannel ( slotId - 1 ); }
 
 protected:
     virtual void SendProtMessage ( int iChID, CVector<uint8_t> vecMessage ) = 0;
@@ -74,6 +77,10 @@ protected:
     virtual void CreateOtherMuteStateChanged ( const int iCurChanID, const int iOtherChanID, const bool bIsMuted ) = 0;
 
     virtual void CreateAndSendJitBufMessage ( const int iCurChanID, const int iNNumFra ) = 0;
+
+    virtual void SetRecordingDirectoryForChannel ( const int iCurChanID, const QString& strRecordingDir ) = 0;
+    virtual void StartRecordingForChannel ( const int iCurChanID ) = 0;
+    virtual void StopRecordingForChannel ( const int iCurChanID ) = 0;
 };
 
 template<>
@@ -187,6 +194,9 @@ protected:
     virtual void CreateOtherMuteStateChanged ( const int iCurChanID, const int iOtherChanID, const bool bIsMuted );
 
     virtual void CreateAndSendJitBufMessage ( const int iCurChanID, const int iNNumFra );
+    virtual void SetRecordingDirectoryForChannel ( const int iCurChanID, const QString& strRecordingDir );
+    virtual void StartRecordingForChannel ( const int iCurChanID );
+    virtual void StopRecordingForChannel ( const int iCurChanID );
 
     virtual void SendProtMessage ( int iChID, CVector<uint8_t> vecMessage );
 

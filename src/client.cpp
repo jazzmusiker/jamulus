@@ -24,6 +24,8 @@
 
 #include "client.h"
 #include "util.h"
+#include <QDir>
+#include <QFileInfo>
 
 /* Implementation *************************************************************/
 CClient::CClient ( const quint16  iPortNumber,
@@ -68,6 +70,10 @@ CClient::CClient ( const quint16  iPortNumber,
     bJitterBufferOK ( true ),
     bEnableIPv6 ( bNEnableIPv6 ),
     bMuteMeInPersonalMix ( bNMuteMeInPersonalMix ),
+    bIsLocalRecording ( false ),
+    strLocalRecordingFilePath ( "" ),
+    pLocalRecordingFile ( nullptr ),
+    pLocalRecordingStream ( nullptr ),
     iServerSockBufNumFrames ( DEF_NET_BUF_SIZE_NUM_BL ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
@@ -195,6 +201,8 @@ CClient::CClient ( const quint16  iPortNumber,
 
 CClient::~CClient()
 {
+    StopLocalRecording();
+
     // if we were running, stop sound device
     if ( Sound.IsRunning() )
     {
@@ -214,6 +222,113 @@ CClient::~CClient()
     // free audio modes
     opus_custom_mode_destroy ( OpusMode );
     opus_custom_mode_destroy ( Opus64Mode );
+}
+
+bool CClient::StartLocalRecording ( const QString& strRecordingDir, QString& strError )
+{
+    QMutexLocker locker ( &MutexLocalRecording );
+
+    if ( bIsLocalRecording )
+    {
+        return true;
+    }
+
+    QFileInfo recordingDirInfo ( strRecordingDir );
+    recordingDirInfo.setCaching ( false );
+    const QString recordingDirPath = QDir::toNativeSeparators ( recordingDirInfo.absoluteFilePath() );
+#if defined ( Q_OS_MAC )
+    const QString macOsDirectoryAccessHint =
+        tr ( " On macOS, allow Jamulus access to this folder in System Settings > Privacy & Security > Files and Folders." );
+#endif
+
+    if ( !recordingDirInfo.exists() && !QDir().mkpath ( strRecordingDir ) )
+    {
+        strError = tr ( "The recording directory does not exist and could not be created: %1." ).arg ( recordingDirPath );
+#if defined ( Q_OS_MAC )
+        strError += macOsDirectoryAccessHint;
+#endif
+        return false;
+    }
+
+    if ( !recordingDirInfo.isDir() )
+    {
+        strError = tr ( "The recording path is not a directory: %1." ).arg ( recordingDirPath );
+        return false;
+    }
+
+    if ( !recordingDirInfo.isWritable() )
+    {
+        strError = tr ( "The recording directory is not writable: %1." ).arg ( recordingDirPath );
+#if defined ( Q_OS_MAC )
+        strError += macOsDirectoryAccessHint;
+#endif
+        return false;
+    }
+
+    const QString baseName = "mix-" + QDateTime::currentDateTime().toString ( "yyyyMMdd-HHmmss" );
+    QString       fileName = baseName + ".wav";
+    int           duplicateIndex = 1;
+    QDir          recordingDir ( strRecordingDir );
+    while ( recordingDir.exists ( fileName ) )
+    {
+        fileName = baseName + "_" + QString::number ( duplicateIndex++ ) + ".wav";
+    }
+
+    pLocalRecordingFile = new QFile ( recordingDir.absoluteFilePath ( fileName ) );
+    if ( !pLocalRecordingFile->open ( QFile::OpenMode ( QIODevice::OpenModeFlag::ReadWrite ) ) )
+    {
+        strError = tr ( "Could not create the recording file." );
+        delete pLocalRecordingFile;
+        pLocalRecordingFile = nullptr;
+        return false;
+    }
+
+    strLocalRecordingFilePath = pLocalRecordingFile->fileName();
+    pLocalRecordingStream = new recorder::CWaveStream ( pLocalRecordingFile, 2 /* stereo */ );
+    bIsLocalRecording = true;
+    return true;
+}
+
+void CClient::StopLocalRecording()
+{
+    QMutexLocker locker ( &MutexLocalRecording );
+
+    if ( pLocalRecordingStream != nullptr )
+    {
+        pLocalRecordingStream->finalise();
+        delete pLocalRecordingStream;
+        pLocalRecordingStream = nullptr;
+    }
+
+    if ( pLocalRecordingFile != nullptr )
+    {
+        pLocalRecordingFile->close();
+        delete pLocalRecordingFile;
+        pLocalRecordingFile = nullptr;
+    }
+
+    strLocalRecordingFilePath = "";
+    bIsLocalRecording = false;
+}
+
+QString CClient::GetLocalRecordingFilePath()
+{
+    QMutexLocker locker ( &MutexLocalRecording );
+    return strLocalRecordingFilePath;
+}
+
+void CClient::WriteLocalRecordingFrame ( const CVector<int16_t>& vecsStereoSndCrd )
+{
+    QMutexLocker locker ( &MutexLocalRecording );
+    if ( !bIsLocalRecording || pLocalRecordingStream == nullptr )
+    {
+        return;
+    }
+
+    for ( int i = 0; i < iStereoBlockSizeSam; ++i )
+    {
+        *pLocalRecordingStream << vecsStereoSndCrd[i];
+    }
 }
 
 void CClient::OnSendProtMessage ( CVector<uint8_t> vecMessage )
@@ -1446,6 +1561,8 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
         // if not connected, clear data
         vecsStereoSndCrd.Reset ( 0 );
     }
+
+    WriteLocalRecordingFrame ( vecsStereoSndCrd );
 
     // update socket buffer size
     Channel.UpdateSocketBufferSize();

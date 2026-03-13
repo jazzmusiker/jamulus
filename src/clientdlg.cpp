@@ -24,6 +24,10 @@
 
 #include "clientdlg.h"
 #include "util.h"
+#include <QDateTime>
+#include <QFile>
+#include <QFileInfo>
+#include <QTextStream>
 
 /* Implementation *************************************************************/
 CClientDlg::CClientDlg ( CClient*         pNCliP,
@@ -230,6 +234,9 @@ CClientDlg::CClientDlg ( CClient*         pNCliP,
 
     // init connection button text
     butConnect->setText ( tr ( "C&onnect" ) );
+    butRecord->setText ( tr ( "&Record" ) );
+    butRecord->setChecked ( false );
+    butRecord->setStyleSheet ( "QPushButton:checked { background-color: rgb(200, 0, 0); color: white; }" );
 
     // init input level meter bars
     lbrInputLevelL->SetValue ( 0 );
@@ -451,6 +458,7 @@ CClientDlg::CClientDlg ( CClient*         pNCliP,
     // Connections -------------------------------------------------------------
     // push buttons
     QObject::connect ( butConnect, &QPushButton::clicked, this, &CClientDlg::OnConnectDisconBut );
+    QObject::connect ( butRecord, &QPushButton::clicked, this, &CClientDlg::OnRecordButtonClicked );
 
     // check boxes
     QObject::connect ( chbSettings, &QCheckBox::stateChanged, this, &CClientDlg::OnSettingsStateChanged );
@@ -772,6 +780,43 @@ void CClientDlg::OnConnectDisconBut()
     }
 }
 
+void CClientDlg::OnRecordButtonClicked ( bool checked )
+{
+    if ( !pClient->IsRunning() )
+    {
+        butRecord->setChecked ( false );
+        QMessageBox::warning ( this, APP_NAME, tr ( "Please connect to a server before starting a recording." ) );
+        return;
+    }
+
+    if ( checked )
+    {
+        const QString recordingDirectory = pSettings->strRecordingDirectory.trimmed();
+        if ( recordingDirectory.isEmpty() )
+        {
+            butRecord->setChecked ( false );
+            QMessageBox::warning ( this,
+                                   APP_NAME,
+                                   tr ( "Please configure a recording directory in Advanced Settings first." ) );
+            return;
+        }
+
+        QString strError;
+        if ( !pClient->StartLocalRecording ( recordingDirectory, strError ) )
+        {
+            butRecord->setChecked ( false );
+            QMessageBox::warning ( this, APP_NAME, strError );
+            return;
+        }
+
+        WriteRecordingSidecarFiles ( pClient->GetLocalRecordingFilePath() );
+    }
+    else
+    {
+        pClient->StopLocalRecording();
+    }
+}
+
 void CClientDlg::OnClearAllStoredSoloMuteSettings()
 {
     // if we are in an active connection, we first have to store all fader settings in
@@ -888,8 +933,57 @@ void CClientDlg::OnLicenceRequired ( ELicenceType eLicenceType )
 
 void CClientDlg::OnConClientListMesReceived ( CVector<CChannelInfo> vecChanInfo )
 {
+    vecCurrentConClientList = vecChanInfo;
+
     // update mixer board with the additional client infos
     MainMixerBoard->ApplyNewConClientList ( vecChanInfo );
+}
+
+void CClientDlg::WriteRecordingSidecarFiles ( const QString& recordingFilePath )
+{
+    if ( recordingFilePath.isEmpty() )
+    {
+        return;
+    }
+
+    const QFileInfo recordingFileInfo ( recordingFilePath );
+    const QString   basePath = recordingFileInfo.absolutePath() + "/" + recordingFileInfo.completeBaseName();
+
+    WriteRecordingInfoTextFile ( basePath + ".txt" );
+    WriteRecordingScreenshot ( basePath + ".jpg" );
+}
+
+void CClientDlg::WriteRecordingInfoTextFile ( const QString& infoFilePath )
+{
+    QFile infoFile ( infoFilePath );
+
+    if ( !infoFile.open ( QIODevice::WriteOnly | QIODevice::Text ) )
+    {
+        qWarning() << "Could not create recording info file:" << infoFilePath;
+        return;
+    }
+
+    QTextStream stream ( &infoFile );
+    stream << "recorded musicians\n";
+    stream << "date_time\t" << QDateTime::currentDateTime().toString ( Qt::ISODate ) << "\n";
+    stream << "server\t" << MainMixerBoard->GetServerName() << "\n";
+    stream << "name\tinstrument\tcountry\tcity\n";
+
+    const int musicianCount = vecCurrentConClientList.Size();
+    for ( int i = 0; i < musicianCount; ++i )
+    {
+        const CChannelInfo& channelInfo = vecCurrentConClientList[i];
+        stream << channelInfo.strName << "\t" << CInstPictures::GetName ( channelInfo.iInstrument ) << "\t"
+               << QLocale::countryToString ( channelInfo.eCountry ) << "\t" << channelInfo.strCity << "\n";
+    }
+}
+
+void CClientDlg::WriteRecordingScreenshot ( const QString& screenshotFilePath )
+{
+    if ( !grab().save ( screenshotFilePath, "JPG" ) )
+    {
+        qWarning() << "Could not create recording screenshot:" << screenshotFilePath;
+    }
 }
 
 void CClientDlg::OnNumClientsChanged ( int iNewNumClients )
@@ -1339,6 +1433,8 @@ void CClientDlg::Disconnect()
 
     // clear mixer board (remove all faders)
     MainMixerBoard->HideAll();
+    pClient->StopLocalRecording();
+    butRecord->setChecked ( false );
 }
 
 void CClientDlg::UpdateDisplay()

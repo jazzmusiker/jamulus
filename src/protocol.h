@@ -62,6 +62,9 @@
 #define PROTMESSID_RECORDER_STATE           33 // contains the state of the jam recorder (ERecorderState)
 #define PROTMESSID_REQ_SPLIT_MESS_SUPPORT   34 // request support for split messages
 #define PROTMESSID_SPLIT_MESS_SUPPORTED     35 // split messages are supported
+#define PROTMESSID_SET_RECORDING_DIRECTORY  36 // set server recording directory
+#define PROTMESSID_START_RECORDING          37 // start server-side recording
+#define PROTMESSID_STOP_RECORDING           38 // stop server-side recording
 
 // message IDs of connection less messages (CLM)
 // DEFINITION -> start at 1000, end at 1999, see IsConnectionLessMessageID
@@ -134,6 +137,9 @@ public:
 
     void CreateVersionAndOSMes();
     void CreateRecorderStateMes ( const ERecorderState eRecorderState );
+    void CreateSetRecordingDirectoryMes ( const QString& strRecordingDir );
+    void CreateStartRecordingMes();
+    void CreateStopRecordingMes();
 
     void CreateCLPingMes ( const CHostAddress& InetAddr, const int iMs );
     void CreateCLPingWithNumClientsMes ( const CHostAddress& InetAddr, const int iMs, const int iNumClients );
@@ -261,6 +267,9 @@ protected:
     bool EvaluateLicenceRequiredMes ( const CVector<uint8_t>& vecData );
     bool EvaluateVersionAndOSMes ( const CVector<uint8_t>& vecData );
     bool EvaluateRecorderStateMes ( const CVector<uint8_t>& vecData );
+    bool EvaluateSetRecordingDirectoryMes ( const CVector<uint8_t>& vecData );
+    bool EvaluateStartRecordingMes();
+    bool EvaluateStopRecordingMes();
 
     bool EvaluateCLPingMes ( const CHostAddress& InetAddr, const CVector<uint8_t>& vecData );
     bool EvaluateCLPingWithNumClientsMes ( const CHostAddress& InetAddr, const CVector<uint8_t>& vecData );
@@ -324,6 +333,9 @@ signals:
     void LicenceRequired ( ELicenceType eLicenceType );
     void VersionAndOSReceived ( COSUtil::EOpSystemType eOSType, QString strVersion );
     void RecorderStateReceived ( ERecorderState eRecorderState );
+    void SetRecordingDirectoryReceived ( QString strRecordingDir );
+    void StartRecordingReceived();
+    void StopRecordingReceived();
 
     void CLPingReceived ( CHostAddress InetAddr, int iMs );
     void CLPingWithNumClientsReceived ( CHostAddress InetAddr, int iMs, int iNumClients );

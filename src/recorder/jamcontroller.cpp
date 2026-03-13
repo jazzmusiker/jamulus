@@ -63,6 +63,7 @@ void CJamController::SetEnableRecording ( bool bNewEnableRecording, bool isRunni
 
         if ( !bEnableRecording )
         {
+            emit ClientFilterChanged ( {} );
             emit StopRecorder();
         }
         else if ( !isRunning )
@@ -128,6 +129,7 @@ void CJamController::SetRecordingDir ( QString newRecordingDir, int iServerFrame
         QObject::connect ( this, &CJamController::RestartRecorder, pJamRecorder, &CJamRecorder::OnTriggerSession );
 
         QObject::connect ( this, &CJamController::StopRecorder, pJamRecorder, &CJamRecorder::OnEnd );
+        QObject::connect ( this, &CJamController::ClientFilterChanged, pJamRecorder, &CJamRecorder::OnSetClientFilter );
 
         QObject::connect ( this,
                            &CJamController::EndRecorderThread,
@@ -156,6 +158,8 @@ void CJamController::SetRecordingDir ( QString newRecordingDir, int iServerFrame
         strRecordingDir = "";
     }
 }
+
+void CJamController::SetClientFilter ( const QList<int>& channelIds ) { emit ClientFilterChanged ( channelIds ); }
 
 void CJamController::OnRecordingFailed ( QString error )
 {

@@ -41,15 +41,23 @@ using namespace recorder;
  * Creates a file for the raw PCM data and sets up a QDataStream to which to write received frames.
  * The data is stored Little Endian.
  */
-CJamClient::CJamClient ( const qint64 frame, const int _numChannels, const QString name, const CHostAddress& address, const QDir recordBaseDir ) :
+CJamClient::CJamClient ( const qint64        frame,
+                         const int           _numChannels,
+                         const QString       name,
+                         const CHostAddress& address,
+                         const QDir          recordBaseDir,
+                         const int           fileSequenceNumber,
+                         const QDateTime&    recordingStartDateTime ) :
     startFrame ( frame ),
     numChannels ( static_cast<uint16_t> ( _numChannels ) ),
     name ( name ),
     address ( address ),
     out ( nullptr )
 {
-    // At this point we may not have much of a name
-    QString fileName = ClientName() + "-" + QString::number ( frame ) + "-" + QString::number ( _numChannels );
+    const QString strFileNumber = QString ( "%1" ).arg ( fileSequenceNumber, 4, 10, QChar ( '0' ) );
+    const QString strClientName = TranslateChars ( name );
+    const QString strStartTime  = recordingStartDateTime.toString ( "yyyyMMdd-HHmmss" );
+    QString       fileName      = strFileNumber + "-" + strClientName + "-" + strStartTime;
     QString affix    = "";
     while ( recordBaseDir.exists ( fileName + affix + ".wav" ) )
     {
@@ -148,11 +156,14 @@ QString CJamClient::TranslateChars ( const QString& input ) const
  * @brief CJamSession::CJamSession Construct a new jam recording session
  * @param recordBaseDir The recording base directory
  *
- * Each session is stored into its own subdirectory of the recording base directory.
+ * Session audio files are stored directly in the recording base directory.
  */
 CJamSession::CJamSession ( QDir recordBaseDir ) :
-    sessionDir ( QDir ( recordBaseDir.absoluteFilePath ( "Jam-" + QDateTime().currentDateTimeUtc().toString ( "yyyyMMdd-HHmmsszzz" ) ) ) ),
+    sessionDir ( recordBaseDir ),
+    sessionName ( "Jam-" + QDateTime().currentDateTimeUtc().toString ( "yyyyMMdd-HHmmsszzz" ) ),
+    sessionStartDateTime ( QDateTime::currentDateTime() ),
     currentFrame ( 0 ),
+    nextFileSequenceNumber ( 1 ),
     chIdDisconnected ( -1 ),
     vecptrJamClients ( MAX_NUM_CHANNELS ),
     jamClientConnections()
@@ -242,7 +253,8 @@ void CJamSession::Frame ( const int              iChID,
     if ( vecptrJamClients[iChID] == nullptr )
     {
         // then we have not seen this client this session
-        vecptrJamClients[iChID] = new CJamClient ( currentFrame, numAudioChannels, name, address, sessionDir );
+        vecptrJamClients[iChID] =
+            new CJamClient ( currentFrame, numAudioChannels, name, address, sessionDir, nextFileSequenceNumber++, sessionStartDateTime );
     }
     else if ( numAudioChannels != vecptrJamClients[iChID]->NumAudioChannels() ||
               address.InetAddr != vecptrJamClients[iChID]->ClientAddress().InetAddr ||
@@ -255,7 +267,8 @@ void CJamSession::Frame ( const int              iChID,
         }
         else
         {
-            vecptrJamClients[iChID] = new CJamClient ( currentFrame, numAudioChannels, name, address, sessionDir );
+            vecptrJamClients[iChID] =
+                new CJamClient ( currentFrame, numAudioChannels, name, address, sessionDir, nextFileSequenceNumber++, sessionStartDateTime );
         }
     }
 
@@ -429,6 +442,8 @@ void CJamRecorder::Start()
 void CJamRecorder::OnEnd()
 {
     QMutexLocker mutexLocker ( &ChIdMutex );
+    useClientFilter = false;
+    allowedClientIds.clear();
     if ( isRecording )
     {
         isRecording = false;
@@ -440,6 +455,14 @@ void CJamRecorder::OnEnd()
         delete currentSession;
         currentSession = nullptr;
     }
+}
+
+void CJamRecorder::OnSetClientFilter ( QList<int> channelIds )
+{
+    QMutexLocker mutexLocker ( &ChIdMutex );
+
+    allowedClientIds = QSet<int> ( channelIds.begin(), channelIds.end() );
+    useClientFilter  = !allowedClientIds.isEmpty();
 }
 
 /**
@@ -568,6 +591,12 @@ void CJamRecorder::SessionDirToReaper ( QString& strSessionDirName, int serverFr
 void CJamRecorder::OnDisconnected ( int iChID )
 {
     QMutexLocker mutexLocker ( &ChIdMutex );
+
+    if ( useClientFilter && !allowedClientIds.contains ( iChID ) )
+    {
+        return;
+    }
+
     if ( !isRecording )
     {
         qWarning() << "CJamRecorder::OnDisconnected: channel" << iChID << "disconnected but not recording";
@@ -597,6 +626,11 @@ void CJamRecorder::OnFrame ( const int              iChID,
                              const int              numAudioChannels,
                              const CVector<int16_t> data )
 {
+    if ( useClientFilter && !allowedClientIds.contains ( iChID ) )
+    {
+        return;
+    }
+
     // Make sure we are ready
     if ( !isRecording )
     {

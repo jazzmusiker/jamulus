@@ -25,6 +25,7 @@
 #pragma once
 
 #include <QObject>
+#include <QList>
 
 #include "jamrecorder.h"
 
@@ -42,6 +43,7 @@ public:
     bool           GetRecordingEnabled() { return bEnableRecording; }
     void           RequestNewRecording();
     void           SetEnableRecording ( bool bNewEnableRecording, bool isRunning );
+    void           SetClientFilter ( const QList<int>& channelIds );
     QString        GetRecordingDir() { return strRecordingDir; }
     void           SetRecordingDir ( QString newRecordingDir, int iServerFrameSizeSamples, bool bDisableRecording );
     ERecorderState GetRecorderState();
@@ -64,6 +66,7 @@ signals:
     void StopRecorder();
     void RecordingSessionStarted ( QString sessionDir );
     void EndRecorderThread();
+    void ClientFilterChanged ( QList<int> channelIds );
     void Stopped();
     void ClientDisconnected ( int iChID );
     void AudioFrame ( const int              iChID,

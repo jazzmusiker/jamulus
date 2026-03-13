@@ -102,6 +102,9 @@ CChannel::CChannel ( const bool bNIsServer ) :
     QObject::connect ( &Protocol, &CProtocol::VersionAndOSReceived, this, &CChannel::OnVersionAndOSReceived );
 
     QObject::connect ( &Protocol, &CProtocol::RecorderStateReceived, this, &CChannel::RecorderStateReceived );
+    QObject::connect ( &Protocol, &CProtocol::SetRecordingDirectoryReceived, this, &CChannel::SetRecordingDirectoryReceived );
+    QObject::connect ( &Protocol, &CProtocol::StartRecordingReceived, this, &CChannel::StartRecordingReceived );
+    QObject::connect ( &Protocol, &CProtocol::StopRecordingReceived, this, &CChannel::StopRecordingReceived );
 }
 
 bool CChannel::ProtocolIsEnabled()

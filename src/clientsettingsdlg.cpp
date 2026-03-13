@@ -23,6 +23,7 @@
 \******************************************************************************/
 
 #include "clientsettingsdlg.h"
+#include <QFileDialog>
 
 /* Implementation *************************************************************/
 CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSetP, QWidget* parent ) :
@@ -371,6 +372,15 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
                                              tr ( "Click the button to delete the currently selected custom directory." ) );
     tbtDeleteCustomDirectory->setText ( u8"\u232B" );
 
+    // recording directory
+    QString strRecordingDirectory = "<b>" + tr ( "Recording Directory" ) + ":</b> " +
+                                    tr ( "Select the directory used for server-side multitrack recordings when using the Record button in the main window." );
+    lblRecordingDirectory->setWhatsThis ( strRecordingDirectory );
+    edtRecordingDirectory->setWhatsThis ( strRecordingDirectory );
+    edtRecordingDirectory->setAccessibleName ( tr ( "Recording directory edit box" ) );
+    butRecordingDirectory->setWhatsThis ( strRecordingDirectory );
+    butRecordingDirectory->setAccessibleName ( tr ( "Recording directory browse button" ) );
+
     // current connection status parameter
     QString strConnStats = "<b>" + tr ( "Audio Upstream Rate" ) + ":</b> " +
                            tr ( "Depends on the current audio packet size and "
@@ -463,6 +473,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
 
     // update new client fader level edit box
     edtNewClientLevel->setText ( QString::number ( pSettings->iNewClientFaderLevel ) );
+    edtRecordingDirectory->setText ( pSettings->strRecordingDirectory );
 
     // Input Boost combo box
     cbxInputBoost->clear();
@@ -647,6 +658,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
 
     // line edits
     QObject::connect ( edtNewClientLevel, &QLineEdit::editingFinished, this, &CClientSettingsDlg::OnNewClientLevelEditingFinished );
+    QObject::connect ( edtRecordingDirectory, &QLineEdit::editingFinished, this, &CClientSettingsDlg::OnRecordingDirectoryEditingFinished );
 
     // combo boxes
     QObject::connect ( cbxSoundcard,
@@ -710,6 +722,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
     // Driver Setup button is only available for Windows when JACK is not used
     QObject::connect ( butDriverSetup, &QPushButton::clicked, this, &CClientSettingsDlg::OnDriverSetupClicked );
 #endif
+    QObject::connect ( butRecordingDirectory, &QPushButton::clicked, this, &CClientSettingsDlg::OnSelectRecordingDirectory );
 
     // tool buttons
     QObject::connect ( tbtDeleteCustomDirectory, &QToolButton::clicked, this, [this] { CClientSettingsDlg::OnCustomDirectoriesChanged ( true ); } );
@@ -1011,6 +1024,21 @@ void CClientSettingsDlg::OnEnableOPUS64StateChanged ( int value )
 }
 
 void CClientSettingsDlg::OnFeedbackDetectionChanged ( int value ) { pSettings->bEnableFeedbackDetection = value == Qt::Checked; }
+
+void CClientSettingsDlg::OnSelectRecordingDirectory()
+{
+    const QString currentValue = edtRecordingDirectory->text();
+    const QString newDirectory =
+        QFileDialog::getExistingDirectory ( this, tr ( "Select Recording Directory" ), currentValue, QFileDialog::ShowDirsOnly );
+
+    if ( newDirectory.isEmpty() )
+    {
+        return;
+    }
+
+    edtRecordingDirectory->setText ( newDirectory );
+    pSettings->strRecordingDirectory = newDirectory;
+}
 
 void CClientSettingsDlg::OnCustomDirectoriesChanged ( bool bDelete )
 {

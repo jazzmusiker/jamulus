@@ -479,6 +479,9 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, 
         strDirectoryAddress        = "";
     }
 
+    // recording directory
+    strRecordingDirectory = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", "recordingdir_base64" ) );
+
     // directory type
 
     //### TODO: BEGIN ###//
@@ -723,6 +726,9 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument, bool is
     {
         PutIniSetting ( IniXMLDocument, "client", QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
     }
+
+    // recording directory
+    PutIniSetting ( IniXMLDocument, "client", "recordingdir_base64", ToBase64 ( strRecordingDirectory ) );
 
     // directory type
     SetNumericIniSet ( IniXMLDocument, "client", "directorytype", static_cast<int> ( eDirectoryType ) );

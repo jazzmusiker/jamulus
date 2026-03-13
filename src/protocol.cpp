@@ -824,6 +824,18 @@ void CProtocol::ParseMessageBody ( const CVector<uint8_t>& vecbyMesBodyData, con
                 case PROTMESSID_RECORDER_STATE:
                     EvaluateRecorderStateMes ( vecbyMesBodyDataRef );
                     break;
+
+                case PROTMESSID_SET_RECORDING_DIRECTORY:
+                    EvaluateSetRecordingDirectoryMes ( vecbyMesBodyDataRef );
+                    break;
+
+                case PROTMESSID_START_RECORDING:
+                    EvaluateStartRecordingMes();
+                    break;
+
+                case PROTMESSID_STOP_RECORDING:
+                    EvaluateStopRecordingMes();
+                    break;
                 }
             }
 
@@ -1662,6 +1674,53 @@ bool CProtocol::EvaluateRecorderStateMes ( const CVector<uint8_t>& vecData )
     emit RecorderStateReceived ( static_cast<ERecorderState> ( iRecorderState ) );
 
     return false; // no error
+}
+
+void CProtocol::CreateSetRecordingDirectoryMes ( const QString& strRecordingDir )
+{
+    int        iPos                 = 0; // init position pointer
+    QByteArray strUTF8RecordingDir  = strRecordingDir.toUtf8();
+    const int  iDataLen             = 2 + strUTF8RecordingDir.size();
+    CVector<uint8_t> vecData ( iDataLen );
+
+    PutStringUTF8OnStream ( vecData, iPos, strUTF8RecordingDir );
+    CreateAndSendMessage ( PROTMESSID_SET_RECORDING_DIRECTORY, vecData );
+}
+
+bool CProtocol::EvaluateSetRecordingDirectoryMes ( const CVector<uint8_t>& vecData )
+{
+    int       iPos     = 0;
+    const int iDataLen = vecData.Size();
+    QString   strRecordingDir;
+
+    if ( GetStringFromStream ( vecData, iPos, MAX_SIZE_BYTES_NETW_BUF, strRecordingDir ) )
+    {
+        return true;
+    }
+
+    if ( iPos != iDataLen )
+    {
+        return true;
+    }
+
+    emit SetRecordingDirectoryReceived ( strRecordingDir );
+    return false;
+}
+
+void CProtocol::CreateStartRecordingMes() { CreateAndSendMessage ( PROTMESSID_START_RECORDING, CVector<uint8_t> ( 0 ) ); }
+
+bool CProtocol::EvaluateStartRecordingMes()
+{
+    emit StartRecordingReceived();
+    return false;
+}
+
+void CProtocol::CreateStopRecordingMes() { CreateAndSendMessage ( PROTMESSID_STOP_RECORDING, CVector<uint8_t> ( 0 ) ); }
+
+bool CProtocol::EvaluateStopRecordingMes()
+{
+    emit StopRecordingReceived();
+    return false;
 }
 
 // Connection less messages ----------------------------------------------------

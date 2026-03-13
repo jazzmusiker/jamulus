@@ -320,6 +320,9 @@ inline void CServer::connectChannelSignalsToServerSlots()
     void ( CServer::*pOnMuteStateHasChangedCh ) ( int, bool ) = &CServerSlots<slotId>::OnMuteStateHasChangedCh;
 
     void ( CServer::*pOnServerAutoSockBufSizeChangeCh ) ( int ) = &CServerSlots<slotId>::OnServerAutoSockBufSizeChangeCh;
+    void ( CServer::*pOnSetRecordingDirectoryReceivedCh ) ( QString ) = &CServerSlots<slotId>::OnSetRecordingDirectoryReceivedCh;
+    void ( CServer::*pOnStartRecordingReceivedCh )()                 = &CServerSlots<slotId>::OnStartRecordingReceivedCh;
+    void ( CServer::*pOnStopRecordingReceivedCh )()                  = &CServerSlots<slotId>::OnStopRecordingReceivedCh;
 
     // send message
     QObject::connect ( &vecChannels[iCurChanID], &CChannel::MessReadyForSending, this, pOnSendProtMessCh );
@@ -339,6 +342,11 @@ inline void CServer::connectChannelSignalsToServerSlots()
     // auto socket buffer size change
     QObject::connect ( &vecChannels[iCurChanID], &CChannel::ServerAutoSockBufSizeChange, this, pOnServerAutoSockBufSizeChangeCh );
 
+    // recorder control
+    QObject::connect ( &vecChannels[iCurChanID], &CChannel::SetRecordingDirectoryReceived, this, pOnSetRecordingDirectoryReceivedCh );
+    QObject::connect ( &vecChannels[iCurChanID], &CChannel::StartRecordingReceived, this, pOnStartRecordingReceivedCh );
+    QObject::connect ( &vecChannels[iCurChanID], &CChannel::StopRecordingReceived, this, pOnStopRecordingReceivedCh );
+
     connectChannelSignalsToServerSlots<slotId - 1>();
 }
 
@@ -347,6 +355,37 @@ inline void CServer::connectChannelSignalsToServerSlots<0>()
 {}
 
 void CServer::CreateAndSendJitBufMessage ( const int iCurChanID, const int iNNumFra ) { vecChannels[iCurChanID].CreateJitBufMes ( iNNumFra ); }
+
+void CServer::SetRecordingDirectoryForChannel ( const int iCurChanID, const QString& strRecordingDir )
+{
+    Q_UNUSED ( iCurChanID )
+    SetRecordingDir ( strRecordingDir );
+    CreateAndSendRecorderStateForAllConChannels();
+}
+
+void CServer::StartRecordingForChannel ( const int iCurChanID )
+{
+    Q_UNUSED ( iCurChanID )
+
+    QList<int> connectedChannelIds;
+    connectedChannelIds.reserve ( iMaxNumChannels );
+    for ( int i = 0; i < iMaxNumChannels; ++i )
+    {
+        if ( vecChannels[i].IsConnected() )
+        {
+            connectedChannelIds.append ( i );
+        }
+    }
+
+    JamController.SetClientFilter ( connectedChannelIds );
+    SetEnableRecording ( true );
+}
+
+void CServer::StopRecordingForChannel ( const int iCurChanID )
+{
+    Q_UNUSED ( iCurChanID )
+    SetEnableRecording ( false );
+}
 
 CServer::~CServer()
 {

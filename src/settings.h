@@ -154,6 +154,7 @@ public:
         eChannelSortType ( ST_NO_SORT ),
         iNumMixerPanelRows ( 1 ),
         vstrDirectoryAddress ( MAX_NUM_SERVER_ADDR_ITEMS, "" ),
+        strRecordingDirectory ( "" ),
         eDirectoryType ( AT_DEFAULT ),
         bEnableFeedbackDetection ( true ),
         bEnableAudioAlerts ( false ),
@@ -187,6 +188,7 @@ public:
     EChSortType      eChannelSortType;
     int              iNumMixerPanelRows;
     CVector<QString> vstrDirectoryAddress;
+    QString          strRecordingDirectory;
     EDirectoryType   eDirectoryType;
     int              iCustomDirectoryIndex; // index of selected custom directory
     bool             bEnableFeedbackDetection;
