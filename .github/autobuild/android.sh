@@ -35,11 +35,11 @@ ANDROID_NDK_VERSION=r26d
 ANDROID_PLATFORM=android-30
 ANDROID_BUILD_TOOLS=30.0.2
 AQTINSTALL_VERSION=3.3.0
-QT_VERSION=5.15.2
+QT_VERSION=5.15.18
 
 # Only variables which are really needed by sub-commands are exported.
 # Definitions have to stay in a specific order due to dependencies.
-QT_BASEDIR="/opt/Qt"
+QT_BASEDIR="/opt/homebrew/Cellar/qt@5"
 ANDROID_BASEDIR="/opt/android"
 BUILD_DIR=build
 export ANDROID_SDK_ROOT="${ANDROID_BASEDIR}/android-sdk"
@@ -116,7 +116,7 @@ setup_qt() {
 }
 
 build_app_as_apk() {
-    local QT_DIR="${QT_BASEDIR}/${QT_VERSION}/android"
+    local QT_DIR="${QT_BASEDIR}/${QT_VERSION}"
     local MAKE="${ANDROID_NDK_ROOT}/prebuilt/${ANDROID_NDK_HOST}/bin/make"
 
     "${QT_DIR}/bin/qmake" -spec android-clang

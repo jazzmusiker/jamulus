@@ -162,6 +162,9 @@ void CSound::closeStreams()
 
 void CSound::Start()
 {
+    mCountCallbacksToDrain = kNumCallbacksToDrain;
+    mStats.reset();
+
     openStreams();
 
     // call base class
@@ -234,12 +237,8 @@ oboe::DataCallbackResult CSound::onAudioInput ( oboe::AudioStream* oboeStream, v
     // First things first, we need to discard the input queue a little for 500ms or so
     if ( mCountCallbacksToDrain > 0 )
     {
-        // discard the input buffer
-        const int32_t numBytes = numFrames * oboeStream->getBytesPerFrame();
-
-        vecsTmpInputAudioSndCrdStereo.resize ( numBytes, 0 );
-
         mCountCallbacksToDrain--;
+        return oboe::DataCallbackResult::Continue;
     }
 
     // We're good to start recording now

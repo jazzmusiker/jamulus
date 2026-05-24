@@ -855,7 +855,7 @@ void CClientDlg::OnChatTextReceived ( QString strChatText )
     // the dialog to be upfront in case a licence text is shown. For all
     // other new chat texts we do not want to force the dialog to be upfront
     // always when a new message arrives since this is annoying.
-    ShowChatWindow ( ( strChatText.indexOf ( WELCOME_MESSAGE_PREFIX ) == 0 ) );
+    //ShowChatWindow ( ( strChatText.indexOf ( WELCOME_MESSAGE_PREFIX ) == 0 ) );
 
     UpdateDisplay();
 }

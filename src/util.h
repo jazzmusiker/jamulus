@@ -529,7 +529,7 @@ enum EGUIDesign
 // Default, fallback skin if no skin was selected
 #if defined( Q_OS_IOS ) || defined( ANDROID ) || defined( Q_OS_ANDROID )
 // on mobile, slim UI is preferred for space reasons
-#    define GD_DEFAULT GD_SLIMFADER
+#    define GD_DEFAULT GD_ORIGINAL
 #else
 #    define GD_DEFAULT GD_ORIGINAL
 #endif
