@@ -40,7 +40,11 @@
 #endif
 #include "util.h"
 #ifdef ANDROID
-#    include <QtAndroidExtras/QtAndroid>
+#    if QT_CONFIG(permissions)
+// Android runtime permissions: QtCore generic permission API.
+#        include <QtCore/qpermissions.h>
+#        include <QEventLoop>
+#    endif
 #endif
 #if defined( Q_OS_MACOS )
 #    include "mac/activity.h"
@@ -828,18 +832,29 @@ int main ( int argc, char** argv )
 #endif
 
 #ifdef ANDROID
-    // special Android coded needed for record audio permission handling
-    auto result = QtAndroid::checkPermission ( QString ( "android.permission.RECORD_AUDIO" ) );
+    // Android runtime permission handling for record audio.
+    // Qt 6.8 does not ship QtAndroidExtras (androidextras), so use the QtCore permission API.
+#    if QT_CONFIG(permissions)
+    Qt::PermissionStatus permStatus = pApp->checkPermission ( QMicrophonePermission{} );
 
-    if ( result == QtAndroid::PermissionResult::Denied )
+    // Qt uses PermissionStatus::Granted / Denied / Undetermined (not Authorized).
+    if ( permStatus != Qt::PermissionStatus::Granted )
     {
-        QtAndroid::PermissionResultMap resultHash = QtAndroid::requestPermissionsSync ( QStringList ( { "android.permission.RECORD_AUDIO" } ) );
+        Qt::PermissionStatus resultStatus = Qt::PermissionStatus::Undetermined;
+        QEventLoop loop;
 
-        if ( resultHash["android.permission.RECORD_AUDIO"] == QtAndroid::PermissionResult::Denied )
-        {
+        // requestPermission callback provides the updated permission object with status().
+        pApp->requestPermission ( QMicrophonePermission{} , pApp,
+                                   [&]( QPermission permission ) {
+                                       resultStatus = permission.status();
+                                       loop.quit();
+                                   } );
+        loop.exec();
+
+        if ( resultStatus == Qt::PermissionStatus::Denied )
             return 0;
-        }
     }
+#    endif
 #endif
 
 #ifdef _WIN32

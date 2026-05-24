@@ -247,7 +247,12 @@ win32 {
     LIBS += -framework AVFoundation \
         -framework AudioToolbox
 } else:android {
-    ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
+    # This project is typically built in per-ABI build directories (e.g. -Android_armeabi_v7a-,
+    # -Android_arm64_v8a-). qmake/Qt's Android mkspec exposes the *single* ABI for the current
+    # configuration via ANDROID_TARGET_ARCH, and androiddeployqt will expect artifacts for
+    # whatever ANDROID_ABIS lists.
+    ANDROID_ABIS = $$ANDROID_TARGET_ARCH
+    isEmpty(ANDROID_ABIS): ANDROID_ABIS = armeabi-v7a arm64-v8a
     ANDROID_VERSION_NAME = $$VERSION
     ANDROID_VERSION_CODE = $$system(git log --oneline | wc -l)
     message("Setting ANDROID_VERSION_NAME=$${ANDROID_VERSION_NAME} ANDROID_VERSION_CODE=$${ANDROID_VERSION_CODE}")
@@ -255,7 +260,8 @@ win32 {
     # liboboe requires C++17 for std::timed_mutex
     CONFIG += c++17
 
-    QT += androidextras
+    # Qt 6.8: androidextras module (QtAndroidExtras) is removed.
+    # Permission handling is done via QtCore permissions API instead.
 
     # enabled only for debugging on android devices
     DEFINES += ANDROIDDEBUG

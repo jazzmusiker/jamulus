@@ -29,7 +29,9 @@ set -eu
 # Some of the following version pinnings are semi-automatically checked for
 # updates. Update .github/workflows/bump-dependencies.yaml when renaming those:
 COMMANDLINETOOLS_VERSION=6858069
-ANDROID_NDK_VERSION=r21d
+# Qt 6.8 expects a modern libc++ runtime; older NDK releases (for example r21)
+# do not provide the pmr symbols that Qt6Core resolves at load time.
+ANDROID_NDK_VERSION=r26d
 ANDROID_PLATFORM=android-30
 ANDROID_BUILD_TOOLS=30.0.2
 AQTINSTALL_VERSION=3.3.0
