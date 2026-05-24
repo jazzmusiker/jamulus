@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Required by Qt's Android deployment template via:
+         android.app.qt_sources_resource_id -> @array/qt_sources
+         (Kein QML nötig -> Liste kann leer sein.) -->
+    <array name="qt_sources">
+    </array>
+</resources>
+
