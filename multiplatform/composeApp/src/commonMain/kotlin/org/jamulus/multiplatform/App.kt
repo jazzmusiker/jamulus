@@ -511,6 +511,7 @@ private fun ConnectScreen(
     var address by remember(preferences.lastServerAddress) { mutableStateOf(preferences.lastServerAddress) }
     var requestedAllDirectories by remember { mutableStateOf(false) }
     var filter by remember(preferences.serverSearchFilter) { mutableStateOf(preferences.serverSearchFilter) }
+    val showAdvancedServerCards = preferences.showAdvancedServerCards
     val ready = snapshot.status != JamulusStatus.ENGINE_UNAVAILABLE && snapshot.status != JamulusStatus.FAILED
 
     LaunchedEffect(ready) {
@@ -518,6 +519,10 @@ private fun ConnectScreen(
             requestedAllDirectories = true
             engine.refreshServerList("")
         }
+    }
+
+    LaunchedEffect(ready, showAdvancedServerCards) {
+        if (ready) engine.setShowServerMusicians(showAdvancedServerCards)
     }
 
     Column(
@@ -553,6 +558,21 @@ private fun ConnectScreen(
             placeholder = { Text("Text oder # für belegte Server") },
             singleLine = true
         )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Erweiterte Darstellung", style = MaterialTheme.typography.bodyMedium)
+            Switch(
+                checked = showAdvancedServerCards,
+                enabled = ready,
+                onCheckedChange = { enabled ->
+                    savePreferences(preferences.copy(showAdvancedServerCards = enabled))
+                },
+                modifier = Modifier.semantics { contentDescription = "Erweiterte Darstellung" }
+            )
+        }
 
         val query = filter.trim().lowercase()
         val filteredServers = snapshot.servers
@@ -605,38 +625,118 @@ private fun ConnectScreen(
                 }
                 items(filteredServers, key = { it.address }) { server ->
                     Card(Modifier.fillMaxWidth()) {
-                        Row(
+                        Column(
                             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Column(Modifier.weight(1f)) {
-                                val serverName = if (server.location.isBlank()) {
-                                    server.name
-                                } else {
-                                    "${server.name} (${server.location})"
-                                }
-                                val serverDirectory = server.directoryKeys
-                                    .distinct()
-                                    .sortedBy { key ->
-                                        snapshot.directories.indexOfFirst { it.key == key }
-                                            .let { index -> if (index < 0) Int.MAX_VALUE else index }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    val serverName = if (server.location.isBlank()) {
+                                        server.name
+                                    } else {
+                                        "${server.name} (${server.location})"
                                     }
-                                    .map { key -> directoryLabel(key, snapshot.directories) }
-                                    .joinToString(", ")
-                                val serverTitle = if (serverDirectory.isBlank()) {
-                                    serverName
-                                } else {
-                                    "$serverName - $serverDirectory"
+                                    val serverDirectory = server.directoryKeys
+                                        .distinct()
+                                        .sortedBy { key ->
+                                            snapshot.directories.indexOfFirst { it.key == key }
+                                                .let { index -> if (index < 0) Int.MAX_VALUE else index }
+                                        }
+                                        .map { key -> directoryLabel(key, snapshot.directories) }
+                                        .joinToString(", ")
+                                    val serverTitle = if (serverDirectory.isBlank()) {
+                                        serverName
+                                    } else {
+                                        "$serverName - $serverDirectory"
+                                    }
+                                    val pingMs = server.pingMs
+                                    val pingColor = when {
+                                        pingMs == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        pingMs <= 25 -> Color(0xFF2E7D32)
+                                        pingMs <= 50 -> Color(0xFFF9A825)
+                                        else -> Color(0xFFC62828)
+                                    }
+                                    val pingStyle = if (pingMs == null) {
+                                        MaterialTheme.typography.bodyMedium
+                                    } else {
+                                        MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = MaterialTheme.typography.bodyMedium.fontSize * 1.2f,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Text(serverTitle, fontWeight = FontWeight.SemiBold)
+                                    if (server.genre.isNotBlank()) Text(server.genre)
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("${server.musicianCount} Musiker")
+                                        Text("·")
+                                        Text(
+                                            pingMs?.let { "$it ms" } ?: "Ping ausstehend",
+                                            style = pingStyle,
+                                            color = pingColor
+                                        )
+                                    }
                                 }
-                                Text(serverTitle, fontWeight = FontWeight.SemiBold)
-                                if (server.genre.isNotBlank()) Text(server.genre)
-                                Text("${server.musicianCount} Musiker · ${server.pingMs?.let { "$it ms" } ?: "Ping ausstehend"}")
+                                Button(enabled = ready, onClick = {
+                                    savePreferences(preferences.rememberServerAddress(server.address))
+                                    scope.launch { engine.connect(server.address) }
+                                }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
+                                    Text("Verbinden")
+                                }
                             }
-                            Button(enabled = ready, onClick = {
-                                savePreferences(preferences.rememberServerAddress(server.address))
-                                scope.launch { engine.connect(server.address) }
-                            }, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
-                                Text("Verbinden")
+                            if (showAdvancedServerCards && server.musicianCount > 0) {
+                                if (server.musicians.isEmpty()) {
+                                    Text(
+                                        "Musiker werden geladen …",
+                                        Modifier.padding(start = 20.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    Column(
+                                        Modifier.fillMaxWidth().padding(start = 4.dp),
+                                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                                    ) {
+                                        server.musicians.forEach { musician ->
+                                            val instrument = snapshot.instruments.firstOrNull { it.id == musician.instrumentId }
+                                            val instrumentIcon = instrument?.icon.orEmpty()
+                                            val instrumentName = instrument?.label.orEmpty()
+                                            val countryIcon = snapshot.countries
+                                                .firstOrNull { it.id == musician.countryId }
+                                                ?.icon
+                                                .orEmpty()
+                                            Row(
+                                                Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                if (instrumentIcon.isNotBlank()) {
+                                                    JamulusIcon(instrumentIcon, Modifier.size(16.dp))
+                                                }
+                                                val musicianLabel = if (instrumentName.isNullOrBlank()) {
+                                                    musician.name
+                                                } else {
+                                                    "${musician.name} ($instrumentName)"
+                                                }
+                                                Text(
+                                                    musicianLabel,
+                                                    Modifier.weight(1f),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (countryIcon.isNotBlank()) {
+                                                    JamulusIcon(countryIcon, Modifier.size(16.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

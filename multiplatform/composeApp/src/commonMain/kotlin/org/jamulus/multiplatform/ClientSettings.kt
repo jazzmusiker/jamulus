@@ -24,6 +24,7 @@ data class ClientPreferences(
     val directoryAddress: String = "",
     val directoryAddressDraft: String = "",
     val serverSearchFilter: String = "",
+    val showAdvancedServerCards: Boolean = false,
     val lastServerAddress: String = "",
     val recentServerAddresses: List<String> = emptyList(),
     val smallNetworkBuffers: Boolean = false,

@@ -68,6 +68,10 @@ private class AndroidJamulusEngine(settingsFile: String) : JamulusEngine {
         if (nativeHandle != 0L) DesktopNativeBridge.nativeRefreshServerList(nativeHandle, directory.take(255))
     }
 
+    override suspend fun setShowServerMusicians(enabled: Boolean) {
+        if (nativeHandle != 0L) DesktopNativeBridge.nativeSetShowServerMusicians(nativeHandle, enabled)
+    }
+
     override suspend fun connect(address: String) {
         if (nativeHandle != 0L) DesktopNativeBridge.nativeConnect(nativeHandle, address.trim().take(255))
     }
@@ -158,6 +162,7 @@ private object DesktopNativeBridge {
     external fun nativeConnect(handle: Long, address: String)
     external fun nativeDisconnect(handle: Long)
     external fun nativeRefreshServerList(handle: Long, directory: String)
+    external fun nativeSetShowServerMusicians(handle: Long, enabled: Boolean)
     external fun nativeSetSendMuted(handle: Long, muted: Boolean)
     external fun nativeSetChannelGain(handle: Long, channelId: Int, gain: Float)
     external fun nativeSetChannelPan(handle: Long, channelId: Int, pan: Float)

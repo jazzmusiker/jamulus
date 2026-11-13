@@ -27,7 +27,15 @@ data class ServerInfo(
     val genre: String = "",
     val musicianCount: Int = 0,
     val pingMs: Int? = null,
-    val directoryKeys: List<String> = emptyList()
+    val directoryKeys: List<String> = emptyList(),
+    val musicians: List<ServerMusician> = emptyList()
+)
+
+@Serializable
+data class ServerMusician(
+    val name: String,
+    val instrumentId: Int = 0,
+    val countryId: Int = 0
 )
 
 @Serializable
@@ -104,6 +112,7 @@ interface JamulusEngine {
     val snapshot: StateFlow<EngineSnapshot>
 
     suspend fun refreshServerList(directory: String)
+    suspend fun setShowServerMusicians(enabled: Boolean)
     suspend fun connect(address: String)
     suspend fun disconnect()
     suspend fun setSendMuted(muted: Boolean)
@@ -136,6 +145,7 @@ class UnavailableJamulusEngine(reason: String) : JamulusEngine {
     override val snapshot: StateFlow<EngineSnapshot> = mutableSnapshot
 
     override suspend fun refreshServerList(directory: String) = Unit
+    override suspend fun setShowServerMusicians(enabled: Boolean) = Unit
     override suspend fun connect(address: String) = Unit
     override suspend fun disconnect() = Unit
     override suspend fun setSendMuted(muted: Boolean) = Unit

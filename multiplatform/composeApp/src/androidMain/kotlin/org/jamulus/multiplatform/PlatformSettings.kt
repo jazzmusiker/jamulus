@@ -31,6 +31,7 @@ private class AndroidClientSettingsRepository(context: Context) : ClientSettings
             store.getString("client.directoryAddress", "")
         ).orEmpty(),
         serverSearchFilter = store.getString("client.serverSearchFilter", "").orEmpty(),
+        showAdvancedServerCards = store.getBoolean("client.showAdvancedServerCards", false),
         lastServerAddress = store.getString("client.lastServerAddress", "").orEmpty(),
         recentServerAddresses = store.getString("client.recentServerAddresses", "").orEmpty()
             .lineSequence().filter(String::isNotBlank).take(10).toList(),
@@ -61,6 +62,7 @@ private class AndroidClientSettingsRepository(context: Context) : ClientSettings
             .putString("client.directoryAddress", preferences.directoryAddress.take(255))
             .putString("client.directoryAddressDraft", preferences.directoryAddressDraft.take(255))
             .putString("client.serverSearchFilter", preferences.serverSearchFilter.take(255))
+            .putBoolean("client.showAdvancedServerCards", preferences.showAdvancedServerCards)
             .putString("client.lastServerAddress", preferences.lastServerAddress.take(255))
             .putString("client.recentServerAddresses", preferences.recentServerAddresses
                 .asSequence().map { it.trim().take(255) }.filter(String::isNotBlank).distinctBy(String::lowercase).take(10).joinToString("\n"))

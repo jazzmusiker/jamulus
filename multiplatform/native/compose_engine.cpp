@@ -113,8 +113,10 @@ public:
         m_serverListTimer ( nullptr ),
         m_pingTimer ( nullptr ),
         m_directoryPingTimer ( nullptr ),
+        m_serverListRosterTimer ( nullptr ),
         m_serverListDirectoryFailures ( 0 ),
         m_serverListLoading ( false ),
+        m_showServerMusicians ( false ),
         m_sendMuted ( false ),
         m_pingMs ( -1 )
     {
@@ -235,11 +237,48 @@ public:
                            &CClient::CLPingTimeWithNumClientsReceived,
                            this,
                            [this] ( const CHostAddress& address, int pingMs, int musicianCount ) {
-                               if ( m_serverAddresses.contains ( address.toString() ) )
+                               const QString serverAddress = address.toString();
+                               if ( m_serverAddresses.contains ( serverAddress ) )
                                {
-                                   m_serverStats.insert ( address.toString(), qMakePair ( pingMs, musicianCount ) );
+                                   m_serverStats.insert ( serverAddress, qMakePair ( pingMs, musicianCount ) );
+                                   if ( m_showServerMusicians )
+                                   {
+                                       RequestServerMusicianList ( address, musicianCount );
+                                   }
                                    PublishSnapshot();
                                }
+                           } );
+        QObject::connect ( m_client,
+                           &CClient::CLConnClientsListMesReceived,
+                           this,
+                           [this] ( const CHostAddress& address, const CVector<CChannelInfo>& channels ) {
+                               const QString serverAddress = address.toString();
+                               if ( !m_showServerMusicians || !m_serverAddresses.contains ( serverAddress ) )
+                               {
+                                   return;
+                               }
+                               m_pendingServerMusicianRequests.remove ( serverAddress );
+                               QJsonArray musicians;
+                               const int instrumentCount = CInstPictures::GetNumAvailableInst();
+                               for ( int i = 0; i < channels.Size(); ++i )
+                               {
+                                   const CChannelInfo& channel = channels[i];
+                                   const int instrumentId = channel.iInstrument >= 0 && channel.iInstrument < instrumentCount
+                                                                ? channel.iInstrument
+                                                                : 0;
+                                   const int countryId = channel.eCountry == QLocale::AnyCountry ||
+                                                                 CLocale::IsCountryCodeSupported ( channel.eCountry )
+                                                             ? static_cast<int> ( channel.eCountry )
+                                                             : static_cast<int> ( QLocale::AnyCountry );
+                                   musicians.append ( QJsonObject{
+                                       { "name", channel.strName.left ( MAX_LEN_FADER_TAG ) },
+                                       { "instrumentId", instrumentId },
+                                       { "countryId", countryId },
+                                   } );
+                               }
+                               m_serverMusicians.insert ( serverAddress, musicians );
+                               m_serverMusicianFetchedAt.insert ( serverAddress, QDateTime::currentMSecsSinceEpoch() );
+                               PublishSnapshot();
                            } );
         QObject::connect ( m_client, &CClient::ChatTextReceived, this, [this] ( const QString& text ) {
             m_chat.append ( QJsonObject{ { "sender", QString() }, { "text", StripChatMarkup ( text ) }, { "timestamp", QString() } } );
@@ -267,6 +306,9 @@ public:
             }
             m_client->CreateCLServerListPingMes ( m_serverPingQueue.dequeue() );
         } );
+        m_serverListRosterTimer = new QTimer ( this );
+        m_serverListRosterTimer->setInterval ( PING_UPDATE_TIME_SERVER_LIST_MS );
+        QObject::connect ( m_serverListRosterTimer, &QTimer::timeout, this, [this]() { QueueServerListPings(); } );
         PublishSnapshot();
     }
 
@@ -294,6 +336,33 @@ public slots:
     {
         m_error.clear();
         m_client->Disconnect();
+        PublishSnapshot();
+    }
+
+    void SetShowServerMusicians ( bool enabled )
+    {
+        m_showServerMusicians = enabled;
+        if ( enabled )
+        {
+            m_serverListRosterTimer->start();
+            QueueServerListPings();
+            for ( const CServerInfo& server : m_servers )
+            {
+                const QString serverAddress = server.HostAddr.toString();
+                const auto stats = m_serverStats.constFind ( serverAddress );
+                if ( stats != m_serverStats.cend() )
+                {
+                    RequestServerMusicianList ( server.HostAddr, stats->second );
+                }
+            }
+        }
+        else
+        {
+            m_serverListRosterTimer->stop();
+            m_pendingServerMusicianRequests.clear();
+            m_serverMusicianFetchedAt.clear();
+            m_serverMusicians.clear();
+        }
         PublishSnapshot();
     }
 
@@ -340,6 +409,9 @@ public slots:
         m_serverStats.clear();
         m_serverAddresses.clear();
         m_serverDirectoryKeys.clear();
+        m_serverMusicians.clear();
+        m_pendingServerMusicianRequests.clear();
+        m_serverMusicianFetchedAt.clear();
         m_serverPingQueue.clear();
         m_directoryPingTimer->stop();
         m_pendingDirectoryRequests.clear();
@@ -628,6 +700,52 @@ private:
         m_serverListTimer->stop();
     }
 
+    void QueueServerListPings()
+    {
+        if ( !m_showServerMusicians || !m_serverPingQueue.isEmpty() || m_directoryPingTimer->isActive() )
+        {
+            return;
+        }
+        for ( const CServerInfo& server : m_servers )
+        {
+            m_serverPingQueue.enqueue ( server.HostAddr );
+        }
+        if ( !m_serverPingQueue.isEmpty() )
+        {
+            m_directoryPingTimer->start();
+        }
+    }
+
+    void RequestServerMusicianList ( const CHostAddress& address, int musicianCount )
+    {
+        const QString serverAddress = address.toString();
+        if ( !m_showServerMusicians || !m_serverAddresses.contains ( serverAddress ) )
+        {
+            return;
+        }
+        if ( musicianCount <= 0 )
+        {
+            m_serverMusicians.insert ( serverAddress, QJsonArray() );
+            m_pendingServerMusicianRequests.remove ( serverAddress );
+            return;
+        }
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        if ( m_serverMusicians.contains ( serverAddress ) &&
+             m_serverMusicians.value ( serverAddress ).size() == musicianCount &&
+             now - m_serverMusicianFetchedAt.value ( serverAddress, 0 ) < 10000 )
+        {
+            return;
+        }
+
+        const auto pendingRequest = m_pendingServerMusicianRequests.constFind ( serverAddress );
+        if ( pendingRequest != m_pendingServerMusicianRequests.cend() && now - pendingRequest.value() < 10000 )
+        {
+            return;
+        }
+        m_pendingServerMusicianRequests.insert ( serverAddress, now );
+        m_client->CreateCLServerListReqConnClientsListMes ( address );
+    }
+
     void ResizeChannelState()
     {
         QVector<bool> activeChannels ( MAX_NUM_CHANNELS, false );
@@ -785,12 +903,14 @@ private:
         QJsonArray servers;
         for ( const CServerInfo& server : m_servers )
         {
-            const QPair<int, int> stats = m_serverStats.value ( server.HostAddr.toString(), qMakePair ( -1, 0 ) );
+            const QString         serverAddress = server.HostAddr.toString();
+            const QPair<int, int> stats         = m_serverStats.value ( serverAddress, qMakePair ( -1, 0 ) );
             QJsonArray directoryKeys;
-            for ( const QString& directoryKey : m_serverDirectoryKeys.value ( server.HostAddr.toString() ) )
+            for ( const QString& directoryKey : m_serverDirectoryKeys.value ( serverAddress ) )
             {
                 directoryKeys.append ( directoryKey );
             }
+            const QJsonArray musicians = m_serverMusicians.value ( serverAddress );
             QStringList locationParts;
             if ( !server.strCity.isEmpty() )
             {
@@ -808,6 +928,7 @@ private:
                 { "musicianCount", stats.second },
                 { "pingMs", stats.first < 0 ? QJsonValue::Null : QJsonValue ( stats.first ) },
                 { "directoryKeys", directoryKeys },
+                { "musicians", musicians },
             } );
         }
 
@@ -881,6 +1002,7 @@ private:
     QTimer*                         m_serverListTimer;
     QTimer*                         m_pingTimer;
     QTimer*                         m_directoryPingTimer;
+    QTimer*                         m_serverListRosterTimer;
     QVector<CServerInfo>            m_servers;
     QVector<PendingDirectoryRequest> m_pendingDirectoryRequests;
     QVector<CChannelInfo>           m_channels;
@@ -888,6 +1010,9 @@ private:
     QHash<QString, QPair<int, int>> m_serverStats;
     QSet<QString>                   m_serverAddresses;
     QHash<QString, QStringList>      m_serverDirectoryKeys;
+    QHash<QString, QJsonArray>       m_serverMusicians;
+    QHash<QString, qint64>           m_pendingServerMusicianRequests;
+    QHash<QString, qint64>           m_serverMusicianFetchedAt;
     QQueue<CHostAddress>            m_serverPingQueue;
     QVector<float>                  m_gains;
     QVector<float>                  m_pans;
@@ -900,6 +1025,7 @@ private:
     QString                         m_serverListError;
     int                             m_serverListDirectoryFailures;
     bool                            m_serverListLoading;
+    bool                            m_showServerMusicians;
     bool                            m_sendMuted;
     int                             m_pingMs;
 };
@@ -1019,6 +1145,19 @@ void CComposeEngineThread::RefreshServerList ( const QString& directory )
     if ( controller != nullptr )
     {
         QMetaObject::invokeMethod ( controller, "PollServerList", Qt::QueuedConnection, Q_ARG ( QString, directory ) );
+    }
+}
+
+void CComposeEngineThread::SetShowServerMusicians ( bool enabled )
+{
+    QPointer<CComposeEngineController> controller;
+    {
+        QMutexLocker locker ( &m_controllerMutex );
+        controller = m_controller;
+    }
+    if ( controller != nullptr )
+    {
+        QMetaObject::invokeMethod ( controller, "SetShowServerMusicians", Qt::QueuedConnection, Q_ARG ( bool, enabled ) );
     }
 }
 
@@ -1334,6 +1473,14 @@ extern "C" JNIEXPORT void JNICALL Java_org_jamulus_multiplatform_DesktopNativeBr
     CComposeEngineThread* engine = reinterpret_cast<CComposeEngineThread*> ( static_cast<intptr_t> ( handle ) );
     if ( engine != nullptr )
         engine->RefreshServerList ( FromJavaString ( env, directory ) );
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_org_jamulus_multiplatform_DesktopNativeBridge_nativeSetShowServerMusicians ( JNIEnv*, jobject, jlong handle, jboolean enabled )
+{
+    CComposeEngineThread* engine = reinterpret_cast<CComposeEngineThread*> ( static_cast<intptr_t> ( handle ) );
+    if ( engine != nullptr )
+        engine->SetShowServerMusicians ( enabled == JNI_TRUE );
 }
 
 extern "C" JNIEXPORT void JNICALL Java_org_jamulus_multiplatform_DesktopNativeBridge_nativeSetSendMuted ( JNIEnv*,

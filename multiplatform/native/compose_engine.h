@@ -29,6 +29,7 @@ public:
     void Connect ( const QString& address );
     void Disconnect();
     void RefreshServerList ( const QString& directory );
+    void SetShowServerMusicians ( bool enabled );
     void SetSendMuted ( bool muted );
     void SetChannelGain ( int channelId, float gain );
     void SetChannelPan ( int channelId, float pan );

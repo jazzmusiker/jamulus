@@ -29,6 +29,7 @@ private class DesktopClientSettingsRepository : ClientSettingsRepository {
             store.get("client.directoryAddress", "")
         ),
         serverSearchFilter = store.get("client.serverSearchFilter", ""),
+        showAdvancedServerCards = store.getBoolean("client.showAdvancedServerCards", false),
         lastServerAddress = store.get("client.lastServerAddress", ""),
         recentServerAddresses = store.get("client.recentServerAddresses", "")
             .lineSequence().filter(String::isNotBlank).take(10).toList(),
@@ -58,6 +59,7 @@ private class DesktopClientSettingsRepository : ClientSettingsRepository {
         store.put("client.directoryAddress", preferences.directoryAddress.take(255))
         store.put("client.directoryAddressDraft", preferences.directoryAddressDraft.take(255))
         store.put("client.serverSearchFilter", preferences.serverSearchFilter.take(255))
+        store.putBoolean("client.showAdvancedServerCards", preferences.showAdvancedServerCards)
         store.put("client.lastServerAddress", preferences.lastServerAddress.take(255))
         store.put("client.recentServerAddresses", preferences.recentServerAddresses
             .asSequence().map { it.trim().take(255) }.filter(String::isNotBlank).distinctBy(String::lowercase).take(10).joinToString("\n"))
