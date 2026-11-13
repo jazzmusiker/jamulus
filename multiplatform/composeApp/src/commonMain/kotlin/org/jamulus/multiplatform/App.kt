@@ -52,6 +52,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -318,6 +319,38 @@ private fun NavigationTooltipIcon(screen: AppScreen, connected: Boolean) {
 }
 
 private val chatUrlPattern = Regex("(https?://|www\\.)[^\\s<>]+", RegexOption.IGNORE_CASE)
+private val jamulusOffWhite = Color(0xFFE6EFFB)
+
+private val jamulusDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF9CCBFF),
+    onPrimary = Color(0xFF08213A),
+    primaryContainer = Color(0xFF173B5D),
+    onPrimaryContainer = Color(0xFFD3E8FF),
+    secondary = Color(0xFFB5C9E0),
+    onSecondary = Color(0xFF203345),
+    secondaryContainer = Color(0xFF263D55),
+    onSecondaryContainer = Color(0xFFDCEBFA),
+    tertiary = Color(0xFFAFC8E0),
+    onTertiary = Color(0xFF1A3348),
+    tertiaryContainer = Color(0xFF304A61),
+    onTertiaryContainer = Color(0xFFD7E9FA),
+    background = Color(0xFF070B12),
+    onBackground = jamulusOffWhite,
+    surface = Color(0xFF0B111A),
+    onSurface = jamulusOffWhite,
+    surfaceVariant = Color(0xFF182534),
+    onSurfaceVariant = Color(0xFFBBCBDD),
+    surfaceTint = Color(0xFF9CCBFF),
+    inverseSurface = jamulusOffWhite,
+    inverseOnSurface = Color(0xFF101722),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    outline = Color(0xFF657D96),
+    outlineVariant = Color(0xFF394E64),
+    scrim = Color(0xFF000000)
+)
 
 private val compactTypography = Typography().let { base ->
     fun smaller(style: TextStyle) = style.copy(
@@ -405,7 +438,7 @@ fun JamulusApp(isAndroid: Boolean) {
         }
     }
 
-    MaterialTheme(typography = compactTypography) {
+    MaterialTheme(colorScheme = jamulusDarkColorScheme, typography = compactTypography) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -931,7 +964,7 @@ private fun MusicianCard(
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (muted) Color(0xFFD32F2F) else Color.Transparent,
-                        contentColor = if (muted) Color.White else MaterialTheme.colorScheme.primary
+                        contentColor = if (muted) jamulusOffWhite else MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text(if (muted) "Stumm" else "Mute")
@@ -945,7 +978,7 @@ private fun MusicianCard(
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (solo) Color(0xFFD32F2F) else Color.Transparent,
-                        contentColor = if (solo) Color.White else MaterialTheme.colorScheme.primary
+                        contentColor = if (solo) jamulusOffWhite else MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text("Solo")
