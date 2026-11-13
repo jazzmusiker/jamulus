@@ -1,0 +1,10 @@
+# Copyright (c) 2026 Thomas Mueller
+# Author(s): Thomas Mueller
+# Licensed under AGPL 3.0 or any later version. See COPYING for details.
+
+.gradle/
+build/
+composeApp/build/
+local.properties
+*.iml
+.idea/
