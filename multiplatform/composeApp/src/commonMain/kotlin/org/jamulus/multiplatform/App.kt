@@ -988,28 +988,36 @@ private fun MusicianCard(
                     contentAlignment = Alignment.Center
                 ) {
                     val trackColor = MaterialTheme.colorScheme.surfaceVariant
-                    val meterGreen = Color(0xFF2E7D32)
-                    Canvas(Modifier.fillMaxWidth().height(48.dp)) {
-                        val inset = 10.dp.toPx()
-                        val startX = inset
-                        val endX = size.width - inset
-                        val centerY = size.height / 2f
-                        val strokeWidth = 4.dp.toPx()
-                        val meterEndX = startX + (endX - startX) * channel.level.coerceIn(0f, 1f)
-                        drawLine(
-                            color = trackColor,
-                            start = Offset(startX, centerY),
-                            end = Offset(endX, centerY),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
-                        drawLine(
-                            color = meterGreen,
-                            start = Offset(startX, centerY),
-                            end = Offset(meterEndX, centerY),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round
-                        )
+                    val meterGreen = Color(0xFF58D68D)
+                    val meterYellow = Color(0xFFFFD166)
+                    val meterRed = Color(0xFFFF6B6B)
+                    Canvas(Modifier.fillMaxWidth().height(24.dp)) {
+                        val segmentGap = 2.dp.toPx()
+                        val segmentCount = (size.width / (4.dp.toPx() + segmentGap)).toInt().coerceIn(1, 32)
+                        val segmentWidth = (size.width - segmentGap * (segmentCount - 1)) / segmentCount
+                        val activeSegmentCount = (channel.level.coerceIn(0f, 1f) * segmentCount).toInt()
+                        val ledHeight = 10.dp.toPx()
+                        val top = (size.height - ledHeight) / 2f
+                        val cornerRadius = CornerRadius(1.5.dp.toPx())
+
+                        for (index in 0 until segmentCount) {
+                            val color = if (index >= activeSegmentCount) {
+                                trackColor
+                            } else if (index < segmentCount * 0.5f) {
+                                meterGreen
+                            } else if (index < segmentCount * 0.95f) {
+                                meterYellow
+                            } else {
+                                meterRed
+                            }
+                            val left = index * (segmentWidth + segmentGap)
+                            drawRoundRect(
+                                color = color,
+                                topLeft = Offset(left, top),
+                                size = Size(segmentWidth, ledHeight),
+                                cornerRadius = cornerRadius
+                            )
+                        }
                     }
                     Slider(
                         value = gain.coerceIn(0f, 1f),
