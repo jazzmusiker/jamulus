@@ -40,10 +40,10 @@ Auf Windows, macOS und Linux wählt der Nutzer beim Start Client- oder Serverbet
 
 ### 4.1 Client: Server finden und verbinden
 
-- Verzeichnis auswählen: Standardverzeichnis oder eines der gespeicherten benutzerdefinierten Verzeichnisse.
-- Serverliste vom Verzeichnis abrufen und den Status beim Laden verständlich anzeigen (Laden, aktuell, leer, Fehler/Timeout).
+- Serverlisten aus allen Standardverzeichnissen und gespeicherten benutzerdefinierten Verzeichnissen abrufen und zu einer Gesamtliste zusammenführen. Die Verbindungsansicht bietet keine Verzeichnisauswahl.
+- Den Status der Gesamt-Abfrage verständlich anzeigen (Laden, aktuell, leer, Fehler/Timeout); Teilausfälle einzelner Verzeichnisse melden und erreichbare Server weiter anzeigen.
 - Server nach Name, Stadt, Land, Stil/Genre und Text filtern; die Liste standardmäßig nach gemessener Pingzeit aufsteigend sortieren und Server ohne Messwert ans Ende stellen. Ein alleinstehendes `#` filtert auf belegte Server. Server nach Stadt/Land gruppieren, soweit diese Angaben vorhanden sind.
-- Serverdetails anzeigen: Name mit Stadt und Land in Klammern, Genre, Anzahl der Musiker, Ping/Latenz und verfügbare Sitzungsinformationen, soweit das Protokoll sie liefert.
+- Serverdetails anzeigen: Name mit Stadt und Land in Klammern, danach „ - “ und die zugehörigen Verzeichnisnamen, Genre, Anzahl der Musiker, Ping/Latenz und verfügbare Sitzungsinformationen, soweit das Protokoll sie liefert.
 - Option „alle Musiker anzeigen“ sowie Servergruppen ein- und ausklappen.
 - Server durch Auswahl und explizite Aktion oder Doppelklick anwählen. Direkte Adresse `host[:port]` eingeben. Eine sichtbare Liste zuletzt verwendeter Serveradressen ist nicht Teil der gewünschten Oberfläche.
 - Während des Verbindungsaufbaus Fortschritt/Fehler zeigen. Verbindung jederzeit trennen; erneute Verbindung zu einer anderen Adresse muss ohne App-Neustart möglich sein.
@@ -79,7 +79,7 @@ Auf Windows, macOS und Linux wählt der Nutzer beim Start Client- oder Serverbet
 
 ### 4.4 Client: erweiterte Optionen und MIDI
 
-- Benutzerdefinierte Verzeichnisse hinzufügen/auswählen/löschen.
+- Benutzerdefinierte Verzeichnisse verwalten; sie werden zusammen mit allen Standardverzeichnissen in der Server-Gesamtansicht berücksichtigt.
 - Standard-Faderpegel für neu auftauchende Teilnehmende, Eingangsverstärkung, Feedback-Erkennung, Verzögerungs-Panning, Skin/Meter-Darstellung, UI-Sprache, Audioalarme und Mixer-Zeilen konfigurieren.
 - Unterstützte MIDI-Eingabegeräte auflisten. MIDI-Kanal, Pickup-Modus, eigene Stummschaltung sowie Steuerung von Fader, Panorama, Mute und Solo einrichten.
 - MIDI-Learn-Workflow: Lernaktion starten, empfangenen Controller zuordnen, abbrechen und Konflikte verständlich anzeigen. MIDI-Verarbeitung verbleibt im nativen Kern.
@@ -157,7 +157,7 @@ Vor UI-Funktionsparität muss die native Engine Facade mindestens Folgendes abbi
 
 - Engine-Status, Modus, Version, Fehler und geordnetes Beenden.
 - Client-Verbindungszustand sowie verbinden/trennen/erneut verbinden zu einer Adresse.
-- Verzeichnis auswählen, Serverliste anfordern/aktualisieren und Serverdetails/Ping empfangen.
+- Alle Serververzeichnisse abrufen, Serverlisten zusammenführen, aktualisieren und Serverdetails/Ping empfangen.
 - Audio-Geräteliste, Kanalzuordnungen, Audioformat, Buffer-/Jittereinstellungen lesen und setzen; Gerätewechsel/Neustart quittieren.
 - Eingangspegel, Delay-/Bufferstatus, Verbindungsping und Kanalpegel ereignisgesteuert liefern.
 - Mixerkanäle lesen; Fader, Pan, Mute, Solo und Gruppierung setzen; eigene Sendestummschaltung getrennt steuern.
@@ -215,7 +215,7 @@ Dieser Abschnitt hält den Stand des vorhandenen lokalen Experiments fest. Er er
 ### 10.1 Bereits implementierte Compose-Funktionen
 
 - Gemeinsame Compose-Oberfläche mit den Ansichten „Verbinden“, „Mixer“, „Chat“ und „Einstellungen“. Die Navigation zeigt gezeichnete, anklickbare Icons für Verbindung, Mixer, Chat und Einstellungen. Die Namen erscheinen nicht dauerhaft unter den Icons, sondern als Tooltip bei Hover (auf Touchgeräten per langem Druck); die Icons behalten zugängliche Beschreibungen. Ein Server-Eintrag und die frühere Server-Platzhalteransicht sind aus der Oberfläche entfernt. Serverbetrieb bleibt außerhalb dieses Client-Prototyps.
-- Verzeichniswahl, direkte Serveradresse und Serverfilter werden lokal gespeichert. Eine manuell eingegebene Verzeichnisadresse wird beim Tippen als Entwurf gesichert, aber erst nach „Aktualisieren“ als aktives Verzeichnis abgefragt. Die Serverliste sortiert nach Ping aufsteigend; nicht gemessene Pings stehen hinten. `#` filtert belegte Server. Standortdaten erscheinen hinter dem Servernamen in Klammern.
+- Die Serverliste wird automatisch aus allen Standardverzeichnissen und allen gespeicherten benutzerdefinierten Verzeichnissen abgerufen und nach Serveradresse zusammengeführt. Ein Refresh fragt alle Verzeichnisse erneut ab; Teilausfälle werden neben den weiter angezeigten Treffern gemeldet. Die Verbindungsansicht enthält keine Verzeichnisauswahl oder einzelne Verzeichnisadresse. Die direkte Serveradresse und der Serverfilter bleiben verfügbar. Die Serverliste sortiert nach Ping aufsteigend; nicht gemessene Pings stehen hinten. `#` filtert belegte Server. Standortdaten stehen hinter dem Servernamen in Klammern; danach folgen „ - “ und alle Verzeichnisse, in denen der Server gefunden wurde.
 - Die zuletzt verwendeten Serveradressen werden im Preference-Modell weiterhin gespeichert, aber auf ausdrücklichen Produktwunsch nicht als „Zuletzt verwendet“-Liste angezeigt.
 - Profilwerte und die im Prototyp angebotenen Audio-/Netzwerkwerte werden lokal gespeichert. Desktop verwendet `java.util.prefs`; die native Jamulus-Engine speichert zusätzlich ihre Einstellungen unter `~/.jamulus-compose/Jamulus.ini` (Windows: im Benutzerverzeichnis). Android verwendet `SharedPreferences` im App-Speicher.
 - Instrumentbilder und Flaggen stammen aus den Jamulus-Ressourcen unter `src/res/`. Der native Snapshot liefert IDs und Ressourcenschlüssel; Compose zeigt sie in Instrument-/Länderauswahl und Musikerkanälen an.

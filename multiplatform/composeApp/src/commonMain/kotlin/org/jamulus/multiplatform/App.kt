@@ -406,7 +406,7 @@ fun JamulusApp(isAndroid: Boolean) {
 
                 Column(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     EngineNotice(snapshot = snapshot)
                     when (selectedScreen) {
@@ -439,6 +439,17 @@ private fun EngineNotice(snapshot: EngineSnapshot) {
     }
 }
 
+private fun directoryLabel(key: String, directories: List<ServerDirectory>): String = when (key) {
+    "0" -> "Alle Genres 1"
+    "1" -> "Alle Genres 2"
+    "2" -> "Alle Genres (Asien)"
+    "3" -> "Genre Rock"
+    "4" -> "Genre Jazz"
+    "5" -> "Genre Klassik / Folk"
+    "6" -> "Genre Chor / Barbershop"
+    else -> directories.firstOrNull { it.key == key }?.name ?: key
+}
+
 @Composable
 private fun ConnectScreen(
     snapshot: EngineSnapshot,
@@ -448,31 +459,14 @@ private fun ConnectScreen(
 ) {
     val scope = rememberCoroutineScope()
     var address by remember(preferences.lastServerAddress) { mutableStateOf(preferences.lastServerAddress) }
-    var directory by remember(preferences.directoryAddressDraft, preferences.directoryAddress) {
-        mutableStateOf(preferences.directoryAddressDraft.ifBlank { preferences.directoryAddress })
-    }
-    var directoryMenuExpanded by remember { mutableStateOf(false) }
-    var requestedDirectory by remember { mutableStateOf("") }
+    var requestedAllDirectories by remember { mutableStateOf(false) }
     var filter by remember(preferences.serverSearchFilter) { mutableStateOf(preferences.serverSearchFilter) }
     val ready = snapshot.status != JamulusStatus.ENGINE_UNAVAILABLE && snapshot.status != JamulusStatus.FAILED
 
-    LaunchedEffect(preferences.directoryAddress, snapshot.directoryAddress, snapshot.status) {
-        val selectedAddress = preferences.directoryAddress
-            .ifBlank { preferences.directoryAddressDraft }
-            .ifBlank { snapshot.directoryAddress }
-        if (selectedAddress.isNotBlank()) {
-            if (ready && requestedDirectory != selectedAddress) {
-                requestedDirectory = selectedAddress
-                if (preferences.directoryAddress != selectedAddress || preferences.directoryAddressDraft != selectedAddress) {
-                    savePreferences(
-                        preferences.copy(
-                            directoryAddress = selectedAddress,
-                            directoryAddressDraft = selectedAddress
-                        )
-                    )
-                }
-                engine.refreshServerList(selectedAddress)
-            }
+    LaunchedEffect(ready) {
+        if (ready && !requestedAllDirectories) {
+            requestedAllDirectories = true
+            engine.refreshServerList("")
         }
     }
 
@@ -481,53 +475,15 @@ private fun ConnectScreen(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text("Mit einem Jamulus-Server verbinden", style = MaterialTheme.typography.headlineSmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    enabled = ready && snapshot.directories.isNotEmpty(),
-                    onClick = { directoryMenuExpanded = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val selectedName = snapshot.directories.firstOrNull { it.address == directory }?.let(::directoryLabel)
-                    Text(selectedName ?: directory.ifBlank { "Verzeichnis auswählen" })
-                }
-                DropdownMenu(
-                    expanded = directoryMenuExpanded,
-                    onDismissRequest = { directoryMenuExpanded = false }
-                ) {
-                    snapshot.directories.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(directoryLabel(option)) },
-                            onClick = {
-                                directoryMenuExpanded = false
-                                directory = option.address
-                                requestedDirectory = option.address
-                                savePreferences(
-                                    preferences.copy(
-                                        directoryAddress = option.address,
-                                        directoryAddressDraft = option.address
-                                    )
-                                )
-                                scope.launch { engine.refreshServerList(option.address) }
-                            }
-                        )
-                    }
-                }
-            }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Server aus allen Verzeichnissen", style = MaterialTheme.typography.titleMedium)
             Button(
-                enabled = ready && directory.isNotBlank(),
-                onClick = {
-                    val selectedAddress = directory.trim().take(255)
-                    requestedDirectory = selectedAddress
-                    directory = selectedAddress
-                    savePreferences(
-                        preferences.copy(
-                            directoryAddress = selectedAddress,
-                            directoryAddressDraft = selectedAddress
-                        )
-                    )
-                    scope.launch { engine.refreshServerList(selectedAddress) }
-                }
+                enabled = ready && !snapshot.serverListLoading,
+                onClick = { scope.launch { engine.refreshServerList("") } }
             ) {
                 Text("Aktualisieren")
             }
@@ -535,17 +491,6 @@ private fun ConnectScreen(
         if (snapshot.serverListLoading) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
-
-        OutlinedTextField(
-            value = directory,
-            onValueChange = {
-                directory = it.take(255)
-                savePreferences(preferences.copy(directoryAddressDraft = it.take(255)))
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Verzeichnisadresse") },
-            singleLine = true
-        )
 
         OutlinedTextField(
             value = filter,
@@ -571,6 +516,12 @@ private fun ConnectScreen(
                 }
             }
 
+        if (snapshot.serverListError.isNotBlank() && snapshot.servers.isNotEmpty()) {
+            Card(Modifier.fillMaxWidth()) {
+                Text(snapshot.serverListError, Modifier.padding(12.dp))
+            }
+        }
+
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -583,7 +534,7 @@ private fun ConnectScreen(
                                 !ready -> snapshot.detail
                                 snapshot.serverListLoading -> "Serverliste wird geladen …"
                                 snapshot.serverListError.isNotBlank() -> snapshot.serverListError
-                                else -> "Keine Server im gewählten Verzeichnis."
+                                else -> "Keine Server in den verfügbaren Verzeichnissen."
                             },
                             Modifier.padding(16.dp)
                         )
@@ -609,10 +560,23 @@ private fun ConnectScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                val serverTitle = if (server.location.isBlank()) {
+                                val serverName = if (server.location.isBlank()) {
                                     server.name
                                 } else {
                                     "${server.name} (${server.location})"
+                                }
+                                val serverDirectory = server.directoryKeys
+                                    .distinct()
+                                    .sortedBy { key ->
+                                        snapshot.directories.indexOfFirst { it.key == key }
+                                            .let { index -> if (index < 0) Int.MAX_VALUE else index }
+                                    }
+                                    .map { key -> directoryLabel(key, snapshot.directories) }
+                                    .joinToString(", ")
+                                val serverTitle = if (serverDirectory.isBlank()) {
+                                    serverName
+                                } else {
+                                    "$serverName - $serverDirectory"
                                 }
                                 Text(serverTitle, fontWeight = FontWeight.SemiBold)
                                 if (server.genre.isNotBlank()) Text(server.genre)
@@ -654,17 +618,6 @@ private fun ConnectScreen(
             }
         }
     }
-}
-
-private fun directoryLabel(directory: ServerDirectory): String = when (directory.key) {
-    "0" -> "Alle Genres 1"
-    "1" -> "Alle Genres 2"
-    "2" -> "Alle Genres (Asien)"
-    "3" -> "Genre Rock"
-    "4" -> "Genre Jazz"
-    "5" -> "Genre Klassik / Folk"
-    "6" -> "Genre Chor / Barbershop"
-    else -> directory.name
 }
 
 @Composable

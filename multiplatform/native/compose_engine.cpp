@@ -16,7 +16,9 @@
 #include <QJsonObject>
 #include <QMetaObject>
 #include <QMutexLocker>
+#include <QQueue>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QTimer>
 
@@ -90,6 +92,13 @@ class CComposeEngineController : public QObject
 {
     Q_OBJECT
 
+    struct PendingDirectoryRequest
+    {
+        CHostAddress address;
+        QString     key;
+        int          attempts;
+    };
+
 public:
     CComposeEngineController ( CComposeEngineThread* engineThread, const QString& settingsFile ) :
         QObject(),
@@ -99,7 +108,8 @@ public:
         m_timer ( nullptr ),
         m_serverListTimer ( nullptr ),
         m_pingTimer ( nullptr ),
-        m_serverListAttempts ( 0 ),
+        m_directoryPingTimer ( nullptr ),
+        m_serverListDirectoryFailures ( 0 ),
         m_serverListLoading ( false ),
         m_sendMuted ( false ),
         m_pingMs ( -1 )
@@ -175,29 +185,57 @@ public:
                            &CProtocol::CLServerListReceived,
                            this,
                            [this] ( const CHostAddress& directory, const CVector<CServerInfo>& servers ) {
-                               if ( directory.InetAddr != m_directoryHostAddress.InetAddr )
+                               int pendingIndex = -1;
+                               for ( int i = 0; i < m_pendingDirectoryRequests.size(); ++i )
+                               {
+                                   if ( directory == m_pendingDirectoryRequests[i].address )
+                                   {
+                                       pendingIndex = i;
+                                       break;
+                                   }
+                               }
+                               if ( pendingIndex < 0 )
                                {
                                    return;
                                }
+                               const QString directoryKey = m_pendingDirectoryRequests[pendingIndex].key;
+                               m_pendingDirectoryRequests.removeAt ( pendingIndex );
 
-                               m_servers.clear();
-                               m_serverStats.clear();
                                for ( int i = 0; i < servers.Size(); ++i )
                                {
+                                   const QString serverAddress = servers[i].HostAddr.toString();
+                                   QStringList&  directoryKeys = m_serverDirectoryKeys[serverAddress];
+                                   if ( !directoryKeys.contains ( directoryKey ) )
+                                   {
+                                       directoryKeys.append ( directoryKey );
+                                   }
+                                   if ( m_serverAddresses.contains ( serverAddress ) )
+                                   {
+                                       continue;
+                                   }
+                                   m_serverAddresses.insert ( serverAddress );
                                    m_servers.append ( servers[i] );
-                                   m_client->CreateCLServerListPingMes ( servers[i].HostAddr );
+                                   m_serverPingQueue.enqueue ( servers[i].HostAddr );
                                }
-                               m_serverListLoading = false;
-                               m_serverListError.clear();
-                               m_serverListTimer->stop();
+                               if ( !m_serverPingQueue.isEmpty() && !m_directoryPingTimer->isActive() )
+                               {
+                                   m_directoryPingTimer->start();
+                               }
+                               if ( m_pendingDirectoryRequests.isEmpty() )
+                               {
+                                   FinishServerListRequest();
+                               }
                                PublishSnapshot();
                            } );
         QObject::connect ( m_client,
                            &CClient::CLPingTimeWithNumClientsReceived,
                            this,
                            [this] ( const CHostAddress& address, int pingMs, int musicianCount ) {
-                               m_serverStats.insert ( address.toString(), qMakePair ( pingMs, musicianCount ) );
-                               PublishSnapshot();
+                               if ( m_serverAddresses.contains ( address.toString() ) )
+                               {
+                                   m_serverStats.insert ( address.toString(), qMakePair ( pingMs, musicianCount ) );
+                                   PublishSnapshot();
+                               }
                            } );
         QObject::connect ( m_client, &CClient::ChatTextReceived, this, [this] ( const QString& text ) {
             m_chat.append ( QJsonObject{ { "sender", QString() }, { "text", StripChatMarkup ( text ) }, { "timestamp", QString() } } );
@@ -215,6 +253,16 @@ public:
         m_serverListTimer = new QTimer ( this );
         m_serverListTimer->setInterval ( 2000 );
         QObject::connect ( m_serverListTimer, &QTimer::timeout, this, [this]() { RetryServerListRequest(); } );
+        m_directoryPingTimer = new QTimer ( this );
+        m_directoryPingTimer->setInterval ( 11 );
+        QObject::connect ( m_directoryPingTimer, &QTimer::timeout, this, [this]() {
+            if ( m_serverPingQueue.isEmpty() )
+            {
+                m_directoryPingTimer->stop();
+                return;
+            }
+            m_client->CreateCLServerListPingMes ( m_serverPingQueue.dequeue() );
+        } );
         PublishSnapshot();
     }
 
@@ -246,25 +294,86 @@ public slots:
 
     void PollServerList ( const QString& directory )
     {
-        const QString selectedAddress = NetworkUtil::FixAddress ( directory.isEmpty() ? m_directoryAddress : directory );
-        CHostAddress  parsedDirectoryAddress;
-        if ( !NetworkUtil::ParseNetworkAddress ( selectedAddress, parsedDirectoryAddress, false ) )
+        QVector<QPair<QString, QString>> directoryEntries;
+        const bool  allDirectories = directory.trimmed().isEmpty();
+        if ( allDirectories )
         {
-            m_serverListLoading = false;
-            m_serverListError   = QStringLiteral ( "Ungültige Verzeichnisadresse." );
-            m_serverListTimer->stop();
-            PublishSnapshot();
-            return;
+            for ( int type = AT_DEFAULT; type < AT_CUSTOM; ++type )
+            {
+                directoryEntries.append ( qMakePair ( QString::number ( type ),
+                                                      NetworkUtil::GetDirectoryAddress ( static_cast<EDirectoryType> ( type ), QString() ) ) );
+            }
+            for ( int index = 0; index < m_settings->vstrDirectoryAddress.Size(); ++index )
+            {
+                if ( !m_settings->vstrDirectoryAddress[index].isEmpty() )
+                {
+                    directoryEntries.append ( qMakePair ( QString ( "custom:%1" ).arg ( index ), m_settings->vstrDirectoryAddress[index] ) );
+                }
+            }
+        }
+        else
+        {
+            directoryEntries.append ( qMakePair ( QString ( "custom:%1" ).arg ( directory ), directory ) );
         }
 
-        RememberDirectory ( selectedAddress );
-        m_directoryHostAddress = parsedDirectoryAddress;
+        if ( !allDirectories )
+        {
+            const QString selectedAddress = NetworkUtil::FixAddress ( directoryEntries.first().second );
+            CHostAddress  parsedDirectoryAddress;
+            if ( !NetworkUtil::ParseNetworkAddress ( selectedAddress, parsedDirectoryAddress, false ) )
+            {
+                m_serverListLoading = false;
+                m_serverListError   = QStringLiteral ( "Ungültige Verzeichnisadresse." );
+                m_serverListTimer->stop();
+                PublishSnapshot();
+                return;
+            }
+            RememberDirectory ( selectedAddress );
+        }
+
         m_servers.clear();
         m_serverStats.clear();
-        m_serverListAttempts = 0;
-        m_serverListLoading  = true;
+        m_serverAddresses.clear();
+        m_serverDirectoryKeys.clear();
+        m_serverPingQueue.clear();
+        m_directoryPingTimer->stop();
+        m_pendingDirectoryRequests.clear();
+        m_serverListDirectoryFailures = 0;
+        QSet<QString> seenDirectoryAddresses;
+        for ( const QPair<QString, QString>& entry : directoryEntries )
+        {
+            const QString selectedAddress = NetworkUtil::FixAddress ( entry.second );
+            if ( selectedAddress.isEmpty() || seenDirectoryAddresses.contains ( selectedAddress.toLower() ) )
+            {
+                continue;
+            }
+            seenDirectoryAddresses.insert ( selectedAddress.toLower() );
+
+            CHostAddress parsedDirectoryAddress;
+            if ( !NetworkUtil::ParseNetworkAddress ( selectedAddress, parsedDirectoryAddress, false ) )
+            {
+                ++m_serverListDirectoryFailures;
+                continue;
+            }
+            const QString directoryHost = parsedDirectoryAddress.toString().toLower();
+            if ( seenDirectoryAddresses.contains ( directoryHost ) )
+            {
+                continue;
+            }
+            seenDirectoryAddresses.insert ( directoryHost );
+            m_pendingDirectoryRequests.append ( PendingDirectoryRequest{ parsedDirectoryAddress, entry.first, 0 } );
+        }
+
+        m_serverListLoading = !m_pendingDirectoryRequests.isEmpty();
         m_serverListError.clear();
-        SendServerListRequest();
+        if ( m_pendingDirectoryRequests.isEmpty() )
+        {
+            FinishServerListRequest();
+        }
+        else
+        {
+            SendServerListRequests();
+        }
         PublishSnapshot();
     }
 
@@ -461,10 +570,13 @@ private:
         m_settings->iCustomDirectoryIndex = 0;
     }
 
-    void SendServerListRequest()
+    void SendServerListRequests()
     {
-        m_client->CreateCLReqServerListMes ( m_directoryHostAddress );
-        ++m_serverListAttempts;
+        for ( PendingDirectoryRequest& request : m_pendingDirectoryRequests )
+        {
+            m_client->CreateCLReqServerListMes ( request.address );
+            ++request.attempts;
+        }
         m_serverListTimer->start();
     }
 
@@ -476,16 +588,39 @@ private:
             return;
         }
 
-        if ( m_serverListAttempts >= 3 )
+        for ( int i = m_pendingDirectoryRequests.size() - 1; i >= 0; --i )
         {
-            m_serverListLoading = false;
-            m_serverListError   = QStringLiteral ( "Das Verzeichnis antwortet nicht. Bitte erneut versuchen." );
-            m_serverListTimer->stop();
+            if ( m_pendingDirectoryRequests[i].attempts >= 3 )
+            {
+                m_pendingDirectoryRequests.removeAt ( i );
+                ++m_serverListDirectoryFailures;
+            }
+        }
+        if ( m_pendingDirectoryRequests.isEmpty() )
+        {
+            FinishServerListRequest();
             PublishSnapshot();
             return;
         }
 
-        SendServerListRequest();
+        SendServerListRequests();
+    }
+
+    void FinishServerListRequest()
+    {
+        m_serverListLoading = false;
+        if ( m_serverListDirectoryFailures > 0 )
+        {
+            m_serverListError = m_serverListDirectoryFailures == 1
+                                    ? QStringLiteral ( "Ein Verzeichnis konnte nicht abgefragt werden." )
+                                    : QStringLiteral ( "%1 Verzeichnisse konnten nicht abgefragt werden." )
+                                          .arg ( m_serverListDirectoryFailures );
+        }
+        else
+        {
+            m_serverListError.clear();
+        }
+        m_serverListTimer->stop();
     }
 
     void ResizeChannelState()
@@ -646,6 +781,11 @@ private:
         for ( const CServerInfo& server : m_servers )
         {
             const QPair<int, int> stats = m_serverStats.value ( server.HostAddr.toString(), qMakePair ( -1, 0 ) );
+            QJsonArray directoryKeys;
+            for ( const QString& directoryKey : m_serverDirectoryKeys.value ( server.HostAddr.toString() ) )
+            {
+                directoryKeys.append ( directoryKey );
+            }
             QStringList locationParts;
             if ( !server.strCity.isEmpty() )
             {
@@ -662,6 +802,7 @@ private:
                 { "genre", QString() },
                 { "musicianCount", stats.second },
                 { "pingMs", stats.first < 0 ? QJsonValue::Null : QJsonValue ( stats.first ) },
+                { "directoryKeys", directoryKeys },
             } );
         }
 
@@ -734,11 +875,15 @@ private:
     QTimer*                         m_timer;
     QTimer*                         m_serverListTimer;
     QTimer*                         m_pingTimer;
-    CHostAddress                    m_directoryHostAddress;
+    QTimer*                         m_directoryPingTimer;
     QVector<CServerInfo>            m_servers;
+    QVector<PendingDirectoryRequest> m_pendingDirectoryRequests;
     QVector<CChannelInfo>           m_channels;
     QVector<uint16_t>               m_levels;
     QHash<QString, QPair<int, int>> m_serverStats;
+    QSet<QString>                   m_serverAddresses;
+    QHash<QString, QStringList>      m_serverDirectoryKeys;
+    QQueue<CHostAddress>            m_serverPingQueue;
     QVector<float>                  m_gains;
     QVector<float>                  m_pans;
     QVector<bool>                   m_muted;
@@ -748,7 +893,7 @@ private:
     QString                         m_audioError;
     QString                         m_directoryAddress;
     QString                         m_serverListError;
-    int                             m_serverListAttempts;
+    int                             m_serverListDirectoryFailures;
     bool                            m_serverListLoading;
     bool                            m_sendMuted;
     int                             m_pingMs;

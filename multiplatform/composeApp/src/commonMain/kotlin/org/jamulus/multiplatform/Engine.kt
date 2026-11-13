@@ -26,7 +26,8 @@ data class ServerInfo(
     val location: String = "",
     val genre: String = "",
     val musicianCount: Int = 0,
-    val pingMs: Int? = null
+    val pingMs: Int? = null,
+    val directoryKeys: List<String> = emptyList()
 )
 
 @Serializable
