@@ -68,7 +68,11 @@ JNIEnv* AttachCurrentThread ( JavaVM* javaVM, bool& didAttach )
         return nullptr;
     }
 
+#if defined( Q_OS_ANDROID )
+    if ( javaVM->AttachCurrentThread ( &env, nullptr ) != JNI_OK )
+#else
     if ( javaVM->AttachCurrentThread ( reinterpret_cast<void**> ( &env ), nullptr ) != JNI_OK )
+#endif
     {
         return nullptr;
     }
@@ -281,6 +285,7 @@ public slots:
     void ConnectToServer ( const QString& address )
     {
         m_error.clear();
+        SetClientSendMuted ( true );
         m_client->Connect ( address, address );
         PublishSnapshot();
     }

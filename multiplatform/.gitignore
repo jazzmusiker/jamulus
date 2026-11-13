@@ -5,6 +5,7 @@
 .gradle/
 build/
 composeApp/build/
+native/android-build/
 local.properties
 *.iml
 .idea/

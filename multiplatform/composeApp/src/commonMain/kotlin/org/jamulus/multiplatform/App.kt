@@ -20,6 +20,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -93,66 +99,110 @@ private enum class AppScreen(val title: String) {
 }
 
 @Composable
-private fun ConnectNavigationIcon() {
+private fun ConnectNavigationIcon(connected: Boolean) {
     val iconColor = LocalContentColor.current
     Canvas(Modifier.size(24.dp)) {
         val scale = size.width / 24f
         val lineWidth = 1.8f * scale
 
-        drawRoundRect(
-            color = iconColor,
-            topLeft = Offset(0.8f * scale, 1f * scale),
-            size = Size(9.5f * scale, 7.2f * scale),
-            cornerRadius = CornerRadius(1f * scale),
-            style = Stroke(lineWidth)
-        )
-        drawLine(
-            color = iconColor,
-            start = Offset(2.2f * scale, 6.3f * scale),
-            end = Offset(8.9f * scale, 6.3f * scale),
-            strokeWidth = lineWidth
-        )
-        drawLine(
-            color = iconColor,
-            start = Offset(5.5f * scale, 8.3f * scale),
-            end = Offset(5.5f * scale, 9.8f * scale),
-            strokeWidth = lineWidth
-        )
-        drawLine(
-            color = iconColor,
-            start = Offset(3.5f * scale, 9.8f * scale),
-            end = Offset(7.5f * scale, 9.8f * scale),
-            strokeWidth = lineWidth,
-            cap = StrokeCap.Round
-        )
-
-        val connectionDots = listOf(
-            Offset(11f, 3.7f), Offset(13f, 3.7f), Offset(15f, 3.7f),
-            Offset(16f, 5.3f), Offset(16f, 7.3f), Offset(16f, 9.3f),
-            Offset(16f, 11.3f), Offset(16f, 13.3f), Offset(14.8f, 15f),
-            Offset(12.8f, 15f)
-        )
-        connectionDots.forEach { point ->
-            drawCircle(
+        if (connected) {
+            drawRoundRect(
                 color = iconColor,
-                radius = 0.85f * scale,
-                center = Offset(point.x * scale, point.y * scale)
+                topLeft = Offset(2.5f * scale, 2.5f * scale),
+                size = Size(13.5f * scale, 19f * scale),
+                cornerRadius = CornerRadius(1.2f * scale),
+                style = Stroke(lineWidth)
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(3f * scale, 12f * scale),
+                end = Offset(15.5f * scale, 12f * scale),
+                strokeWidth = lineWidth
+            )
+            listOf(7f, 17f).forEach { y ->
+                drawCircle(
+                    color = iconColor,
+                    radius = 1f * scale,
+                    center = Offset(6f * scale, y * scale)
+                )
+                drawLine(
+                    color = iconColor,
+                    start = Offset(9f * scale, y * scale),
+                    end = Offset(13.5f * scale, y * scale),
+                    strokeWidth = lineWidth,
+                    cap = StrokeCap.Round
+                )
+            }
+            drawLine(
+                color = iconColor,
+                start = Offset(17f * scale, 8f * scale),
+                end = Offset(22f * scale, 13f * scale),
+                strokeWidth = lineWidth,
+                cap = StrokeCap.Round
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(22f * scale, 8f * scale),
+                end = Offset(17f * scale, 13f * scale),
+                strokeWidth = lineWidth,
+                cap = StrokeCap.Round
+            )
+        } else {
+            drawRoundRect(
+                color = iconColor,
+                topLeft = Offset(0.8f * scale, 1f * scale),
+                size = Size(9.5f * scale, 7.2f * scale),
+                cornerRadius = CornerRadius(1f * scale),
+                style = Stroke(lineWidth)
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(2.2f * scale, 6.3f * scale),
+                end = Offset(8.9f * scale, 6.3f * scale),
+                strokeWidth = lineWidth
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(5.5f * scale, 8.3f * scale),
+                end = Offset(5.5f * scale, 9.8f * scale),
+                strokeWidth = lineWidth
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(3.5f * scale, 9.8f * scale),
+                end = Offset(7.5f * scale, 9.8f * scale),
+                strokeWidth = lineWidth,
+                cap = StrokeCap.Round
+            )
+
+            val connectionDots = listOf(
+                Offset(11f, 3.7f), Offset(13f, 3.7f), Offset(15f, 3.7f),
+                Offset(16f, 5.3f), Offset(16f, 7.3f), Offset(16f, 9.3f),
+                Offset(16f, 11.3f), Offset(16f, 13.3f), Offset(14.8f, 15f),
+                Offset(12.8f, 15f)
+            )
+            connectionDots.forEach { point ->
+                drawCircle(
+                    color = iconColor,
+                    radius = 0.85f * scale,
+                    center = Offset(point.x * scale, point.y * scale)
+                )
+            }
+
+            drawRoundRect(
+                color = iconColor,
+                topLeft = Offset(14f * scale, 15.2f * scale),
+                size = Size(9.2f * scale, 7.2f * scale),
+                cornerRadius = CornerRadius(1f * scale),
+                style = Stroke(lineWidth)
+            )
+            drawLine(
+                color = iconColor,
+                start = Offset(15.4f * scale, 20.5f * scale),
+                end = Offset(21.8f * scale, 20.5f * scale),
+                strokeWidth = lineWidth
             )
         }
-
-        drawRoundRect(
-            color = iconColor,
-            topLeft = Offset(14f * scale, 15.2f * scale),
-            size = Size(9.2f * scale, 7.2f * scale),
-            cornerRadius = CornerRadius(1f * scale),
-            style = Stroke(lineWidth)
-        )
-        drawLine(
-            color = iconColor,
-            start = Offset(15.4f * scale, 20.5f * scale),
-            end = Offset(21.8f * scale, 20.5f * scale),
-            strokeWidth = lineWidth
-        )
     }
 }
 
@@ -243,9 +293,9 @@ private fun SettingsNavigationIcon() {
 }
 
 @Composable
-private fun NavigationScreenIcon(screen: AppScreen) {
+private fun NavigationScreenIcon(screen: AppScreen, connected: Boolean) {
     when (screen) {
-        AppScreen.CONNECT -> ConnectNavigationIcon()
+        AppScreen.CONNECT -> ConnectNavigationIcon(connected)
         AppScreen.MIX -> MixerNavigationIcon()
         AppScreen.CHAT -> ChatNavigationIcon()
         AppScreen.SETTINGS -> SettingsNavigationIcon()
@@ -254,14 +304,15 @@ private fun NavigationScreenIcon(screen: AppScreen) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NavigationTooltipIcon(screen: AppScreen) {
+private fun NavigationTooltipIcon(screen: AppScreen, connected: Boolean) {
+    val title = if (screen == AppScreen.CONNECT && connected) "Trennen" else screen.title
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(screen.title) } },
+        tooltip = { PlainTooltip { Text(title) } },
         state = rememberTooltipState()
     ) {
-        Box(Modifier.semantics { contentDescription = screen.title }) {
-            NavigationScreenIcon(screen)
+        Box(Modifier.semantics { contentDescription = title }) {
+            NavigationScreenIcon(screen, connected)
         }
     }
 }
@@ -304,10 +355,19 @@ fun JamulusApp(isAndroid: Boolean) {
     val settingsRepository = remember { createClientSettingsRepository() }
     var preferences by remember { mutableStateOf(settingsRepository.load()) }
     val snapshot by engine.snapshot.collectAsState()
+    val connected = snapshot.status == JamulusStatus.CONNECTED
     val scope = rememberCoroutineScope()
     var selectedScreen by remember { mutableStateOf(AppScreen.CONNECT) }
     var nativeSettingsInitialized by remember { mutableStateOf(isAndroid) }
     val screens = AppScreen.entries
+    val onNavigationClick: (AppScreen) -> Unit = { screen ->
+        if (screen == AppScreen.CONNECT && connected) {
+            selectedScreen = AppScreen.CONNECT
+            scope.launch { engine.disconnect() }
+        } else {
+            selectedScreen = screen
+        }
+    }
     val savePreferences: (ClientPreferences) -> Unit = { updated ->
         preferences = updated
         settingsRepository.save(updated)
@@ -339,9 +399,9 @@ fun JamulusApp(isAndroid: Boolean) {
         }
     }
 
-    DisposableEffect(engine, isAndroid) {
+    DisposableEffect(engine) {
         onDispose {
-            if (!isAndroid) engine.close()
+            engine.close()
         }
     }
 
@@ -357,16 +417,6 @@ fun JamulusApp(isAndroid: Boolean) {
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
-                    },
-                    actions = {
-                        if (snapshot.status == JamulusStatus.CONNECTED) {
-                            OutlinedButton(onClick = {
-                                selectedScreen = AppScreen.CONNECT
-                                scope.launch { engine.disconnect() }
-                            }) {
-                                Text("Trennen")
-                            }
-                        }
                     }
                 )
             },
@@ -377,8 +427,8 @@ fun JamulusApp(isAndroid: Boolean) {
                             NavigationBarItem(
                                 selected = selectedScreen == screen,
                                 enabled = screen !in setOf(AppScreen.MIX, AppScreen.CHAT) || snapshot.status == JamulusStatus.CONNECTED,
-                                onClick = { selectedScreen = screen },
-                                icon = { NavigationTooltipIcon(screen) },
+                                onClick = { onNavigationClick(screen) },
+                                icon = { NavigationTooltipIcon(screen, connected) },
                                 label = null
                             )
                         }
@@ -396,8 +446,8 @@ fun JamulusApp(isAndroid: Boolean) {
                             NavigationRailItem(
                                 selected = selectedScreen == screen,
                                 enabled = screen !in setOf(AppScreen.MIX, AppScreen.CHAT) || snapshot.status == JamulusStatus.CONNECTED,
-                                onClick = { selectedScreen = screen },
-                                icon = { NavigationTooltipIcon(screen) },
+                                onClick = { onNavigationClick(screen) },
+                                icon = { NavigationTooltipIcon(screen, connected) },
                                 label = null
                             )
                         }
@@ -630,6 +680,21 @@ private fun MixerScreen(snapshot: EngineSnapshot, engine: JamulusEngine) {
     LaunchedEffect(snapshot.sendMuted) {
         sendMuted = snapshot.sendMuted
     }
+    val muteButtonBlinkingRed = if (sendMuted && engineReady) {
+        val transition = rememberInfiniteTransition(label = "send-stream-muted")
+        val blinkProgress by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 500, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "send-stream-muted-blink"
+        )
+        blinkProgress >= 0.5f
+    } else {
+        false
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
@@ -658,6 +723,18 @@ private fun MixerScreen(snapshot: EngineSnapshot, engine: JamulusEngine) {
                         sendMuted = !sendMuted
                         scope.launch { engine.setSendMuted(sendMuted) }
                     },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (muteButtonBlinkingRed) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        contentColor = if (muteButtonBlinkingRed) {
+                            MaterialTheme.colorScheme.onError
+                        } else {
+                            MaterialTheme.colorScheme.onPrimary
+                        }
+                    ),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(if (sendMuted) "Eigenen Sendestream einschalten" else "Eigenen Sendestream stummschalten")

@@ -2,9 +2,10 @@
 // Author(s): Thomas Mueller
 // Licensed under AGPL 3.0 or any later version. See COPYING for details.
 
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Exec
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -23,6 +24,7 @@ val nativeLibraryName = when {
 }
 val nativeLibraryFile = nativeBuildDirectory.file(nativeLibraryName)
 val generatedNativeResources = layout.buildDirectory.dir("generated/jamulusNativeResources/desktopMain")
+val generatedAndroidJniLibs = layout.buildDirectory.dir("generated/androidJniLibs")
 val defaultQmake = if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
     "/opt/homebrew/opt/qt@5/bin/qmake"
 } else {
@@ -34,6 +36,47 @@ val nativeMakeExecutable = providers.gradleProperty("jamulus.make").orElse(
 )
 val isMacOS = System.getProperty("os.name").startsWith("Mac", ignoreCase = true)
 val qtInstallPrefix = providers.gradleProperty("jamulus.qt.prefix").orElse("/opt/homebrew/opt/qt@5")
+val androidQtDirectory = providers.gradleProperty("jamulus.android.qt")
+    .orElse(providers.environmentVariable("QT_ANDROID_DIR"))
+    .orElse(File(System.getProperty("user.home"), "Qt/6.10.3/android_arm64_v8a").absolutePath)
+val androidQtJavaRuntime = androidQtDirectory.map { File(it, "jar/Qt6Android.jar") }
+val androidQmake = providers.gradleProperty("jamulus.android.qmake")
+    .orElse(providers.environmentVariable("ANDROID_QMAKE"))
+val androidNdkRoot = providers.gradleProperty("jamulus.android.ndk")
+    .orElse(providers.environmentVariable("ANDROID_NDK_ROOT"))
+val androidSdkRoot = providers.gradleProperty("jamulus.android.sdk")
+    .orElse(providers.environmentVariable("ANDROID_SDK_ROOT"))
+val androidAbi = providers.gradleProperty("jamulus.android.abi")
+    .orElse(providers.environmentVariable("ANDROID_ABI"))
+    .orElse("arm64-v8a")
+
+val buildJamulusNativeAndroid by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds and stages the Jamulus Qt/Oboe JNI engine for Android."
+
+    inputs.files(fileTree(repositoryDirectory) {
+        include("Jamulus.pro", "src/**", "libs/**", "multiplatform/native/**")
+        exclude("multiplatform/native/build/**", "multiplatform/native/android-build/**")
+    })
+    inputs.property("androidQtDirectory", androidQtDirectory.orNull.orEmpty())
+    inputs.property("androidQmake", androidQmake.orNull.orEmpty())
+    inputs.property("androidNdkRoot", androidNdkRoot.orNull.orEmpty())
+    inputs.property("androidSdkRoot", androidSdkRoot.orNull.orEmpty())
+    inputs.property("androidAbi", androidAbi)
+    outputs.dir(generatedAndroidJniLibs)
+    workingDir(repositoryDirectory)
+    commandLine("bash", repositoryDirectory.resolve("multiplatform/native/build_android_native.sh").absolutePath)
+    doFirst {
+        val qtDirectory = androidQtDirectory.orNull
+            ?: throw GradleException("Set QT_ANDROID_DIR or -Pjamulus.android.qt to a Qt Android kit directory.")
+        environment("QT_ANDROID_DIR", qtDirectory)
+        environment("ANDROID_ABI", androidAbi.get())
+        environment("ANDROID_COMPOSE_NATIVE_OUTPUT", generatedAndroidJniLibs.get().asFile.absolutePath)
+        androidQmake.orNull?.let { environment("QMAKE", it) }
+        androidNdkRoot.orNull?.let { environment("ANDROID_NDK_ROOT", it) }
+        androidSdkRoot.orNull?.let { environment("ANDROID_SDK_ROOT", it) }
+    }
+}
 
 val configureJamulusNativeDesktop by tasks.registering(Exec::class) {
     group = "build"
@@ -112,6 +155,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation(libs.androidx.activity.compose)
+                implementation(files(androidQtJavaRuntime.get()))
             }
         }
         val desktopMain by getting {
@@ -167,17 +211,25 @@ tasks.configureEach {
 
 android {
     namespace = "org.jamulus.multiplatform"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.github.jamulussoftware.jamulus"
         minSdk = 21
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        ndk {
+            abiFilters += androidAbi.get()
+        }
     }
 
     sourceSets.getByName("main").assets.srcDir(repositoryDirectory.resolve("src/res"))
+    sourceSets.getByName("main").jniLibs.srcDir(generatedAndroidJniLibs)
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(buildJamulusNativeAndroid)
 }
 
 compose.desktop {
@@ -194,6 +246,13 @@ compose.desktop {
             )
             macOS {
                 bundleID = "org.jamulus.multiplatform"
+                iconFile.set(project.file("src/desktopMain/resources/jamulus-multi.icns"))
+            }
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/jamulus-multi.ico"))
+            }
+            linux {
+                iconFile.set(project.file("src/desktopMain/resources/jamulus-multi.png"))
             }
         }
     }
